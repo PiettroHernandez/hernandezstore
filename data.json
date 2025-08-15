@@ -1,0 +1,115 @@
+{
+  "products": [
+    {
+      "id": 1755057203624,
+      "name": "anillo giratorio",
+      "shortDesc": "",
+      "price": 4,
+      "stock": 1,
+      "category": "Accesorios",
+      "discount": 5,
+      "images": [
+        "/uploads/1755057203599-26093286.jpg"
+      ]
+    },
+    {
+      "id": 1755057939797,
+      "name": "collar corazon azul",
+      "shortDesc": "collar plateado brillante con dije de corazón azul(acero inoxidable) moda belleza femenina",
+      "price": 8,
+      "stock": 4,
+      "category": "Accesorios",
+      "discount": 2,
+      "images": [
+        "/uploads/1755057939781-748845150.avif"
+      ]
+    },
+    {
+      "id": 1755149807244,
+      "name": "tatoo oscuridad",
+      "shortDesc": "",
+      "price": 4,
+      "stock": 2,
+      "category": "Nuevo",
+      "discount": 10,
+      "images": [
+        "/uploads/1755149807239-186098995.webp"
+      ]
+    },
+    {
+      "id": 1755242225061,
+      "name": "goku",
+      "shortDesc": "",
+      "price": 23,
+      "stock": 2,
+      "category": "Limitados",
+      "discount": 4,
+      "images": [
+        "/uploads/1755242225056-508627709.webp"
+      ]
+    },
+    {
+      "id": 1755292304757,
+      "name": "anillo",
+      "shortDesc": "anillo negro",
+      "price": 12,
+      "stock": 4,
+      "category": "accesorios",
+      "discount": 15,
+      "images": [
+        "https://pomponpima.cl/wp-content/uploads/2022/09/gorro-blanco-1024x1024.jpg"
+      ]
+    },
+    {
+      "id": 1755293612707,
+      "name": "peluche de garfiel",
+      "shortDesc": "ta gordito y panson",
+      "price": 40,
+      "stock": 1,
+      "category": "Nuevo",
+      "discount": 20,
+      "images": [
+        "/uploads/1755293646741-380926285.webp"
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "id": 1,
+      "name": "Nuevo",
+      "label": "Nuevo"
+    },
+    {
+      "id": 2,
+      "name": "Tattoo Temp",
+      "label": "Tattoo Temp"
+    },
+    {
+      "id": 3,
+      "name": "Accesorios",
+      "label": "Accesorios"
+    },
+    {
+      "id": 4,
+      "name": "Limitados",
+      "label": "Limitados"
+    },
+    {
+      "id": 5,
+      "name": "accesorio",
+      "label": "accesorio"
+    },
+    {
+      "id": 6,
+      "name": "accesorios",
+      "label": "accesorios"
+    }
+  ],
+  "discounts": [],
+  "config": {
+    "whatsapp": {
+      "number": "929528308",
+      "message": "Hola! Estoy interesado en {PRODUCT_NAME}, precio S/. {PRICE}"
+    }
+  }
+}

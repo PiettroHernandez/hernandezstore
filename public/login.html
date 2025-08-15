@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - HernándezStore</title>
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #1c1c1c, #2b2b2b);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+.login-container {
+  background: rgba(255,255,255,0.05);
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+  animation: fadeIn 0.8s ease;
+}
+@keyframes fadeIn {
+  from {opacity: 0; transform: translateY(-10px);}
+  to {opacity: 1; transform: translateY(0);}
+}
+img.logo {
+  max-width: 80px;
+  margin-bottom: 15px;
+}
+input {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0;
+  border: none;
+  border-radius: 4px;
+}
+button {
+  background: gold;
+  border: none;
+  padding: 10px;
+  width: 100%;
+  color: black;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button:hover {
+  background: #d4af37;
+}
+.error {
+  color: red;
+  font-size: 0.9em;
+}
+</style>
+</head>
+<body>
+<div class="login-container">
+  <img src="img/logo_provisional.png" alt="Logo" class="logo">
+  <h2>Iniciar Sesión</h2>
+  <input type="text" id="username" placeholder="Usuario">
+  <input type="password" id="password" placeholder="Contraseña">
+  <button onclick="login()">Entrar</button>
+  <div class="error" id="error"></div>
+</div>
+<script>
+function login(){
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  fetch('/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username, password})
+  })
+  .then(res => {
+    if(res.ok) return res.json();
+    throw new Error('Credenciales incorrectas');
+  })
+  .then(data => {
+    window.location.href = '/admin.html';
+  })
+  .catch(err => {
+    document.getElementById('error').textContent = err.message;
+  });
+}
+</script>
+</body>
+</html>
