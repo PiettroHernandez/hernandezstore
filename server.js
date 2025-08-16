@@ -1,87 +1,140 @@
 const express = require('express');
-const fs = require('fs').promises;
-const path = require('path');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
 const session = require('express-session');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+// ===============================
+// Configuración de sesión
+// ===============================
+app.use(session({
+  secret: 'mi_secreto_super_seguro',
+  resave: false,
+  saveUninitialized: true,
+}));
+
+// ===============================
+// Configuración de rutas
+// ===============================
 const DATA_FILE = path.join(__dirname, 'data.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-const app = express();
-app.use(cors());
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true }));
+// Credenciales (puedes cambiarlas si quieres)
+const USERNAME = "admin";
+const PASSWORD = "1234";
 
-// Configuración de sesión
-app.use(
-  session({
-    secret: 'clave_super_secreta',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false }
-  })
-);
+// ===============================
+// Middleware para JSON
+// ===============================
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Crear carpetas si no existen
-(async () => {
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
-  await fs.mkdir(PUBLIC_DIR, { recursive: true });
-})();
-
-// Configuración de subida de archivos
+// ===============================
+// Configuración de multer (subida de imágenes)
+// ===============================
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR);
+}
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, UPLOADS_DIR);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname) || '';
-    cb(null, Date.now() + '-' + Math.round(Math.random() * 1e9) + ext);
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
-// Leer y escribir data.json
-async function readData() {
-  try {
-    const raw = await fs.readFile(DATA_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch {
-    return { products: [], categories: [], discounts: [], config: {} };
-  }
-}
-
-async function writeData(data) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
-}
-
-// Credenciales
-const USERNAME = 'admin';
-const PASSWORD = '1234';
-
-// Login
+// ===============================
+// LOGIN
+// ===============================
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === USERNAME && password === PASSWORD) {
     req.session.user = username;
-    res.json({ ok: true });
+    res.json({ success: true });
   } else {
-    res.status(401).json({ error: 'Credenciales incorrectas' });
+    res.json({ success: false, message: "Credenciales inválidas" });
   }
 });
 
-// Logout
 app.post('/logout', (req, res) => {
   req.session.destroy(() => {
-    res.json({ ok: true });
+    res.json({ success: true });
   });
 });
 
-// Proteger admin
-app.get('/admin.html', (req, res, next) => {
+// ===============================
+// Middleware de autenticación
+// ===============================
+function requireLogin(req, res, next) {
+  if (req.session.user === USERNAME) {
+    next();
+  } else {
+    res.redirect('/login.html');
+  }
+}
+
+// ===============================
+// API de productos
+// ===============================
+app.get('/api/data', (req, res) => {
+  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  res.json(data);
+});
+
+app.post('/api/products', requireLogin, upload.single('image'), (req, res) => {
+  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  const newProduct = {
+    id: Date.now(),
+    name: req.body.name,
+    shortDesc: req.body.shortDesc || "",
+    price: parseFloat(req.body.price),
+    category: req.body.category,
+    discount: req.body.discount ? parseFloat(req.body.discount) : null,
+    stock: req.body.stock ? parseInt(req.body.stock) : 0,
+    images: req.file ? ["/uploads/" + req.file.filename] : []
+  };
+  data.products.push(newProduct);
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  res.json(newProduct);
+});
+
+app.put('/api/products/:id', requireLogin, upload.single('image'), (req, res) => {
+  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  const productId = parseInt(req.params.id);
+  const product = data.products.find(p => p.id === productId);
+
+  if (product) {
+    product.name = req.body.name || product.name;
+    product.shortDesc = req.body.shortDesc || product.shortDesc;
+    product.price = req.body.price ? parseFloat(req.body.price) : product.price;
+    product.category = req.body.category || product.category;
+    product.discount = req.body.discount ? parseFloat(req.body.discount) : product.discount;
+    product.stock = req.body.stock ? parseInt(req.body.stock) : product.stock;
+    if (req.file) product.images = ["/uploads/" + req.file.filename];
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    res.json(product);
+  } else {
+    res.status(404).json({ error: "Producto no encontrado" });
+  }
+});
+
+app.delete('/api/products/:id', requireLogin, (req, res) => {
+  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  const productId = parseInt(req.params.id);
+  data.products = data.products.filter(p => p.id !== productId);
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  res.json({ success: true });
+});
+
+// ===============================
+// Proteger carpeta admin
+// ===============================
+app.use('/admin', (req, res, next) => {
   if (req.session.user === USERNAME) {
     next();
   } else {
@@ -89,147 +142,15 @@ app.get('/admin.html', (req, res, next) => {
   }
 });
 
-// API
-app.get('/api/data', async (req, res) => {
-  const data = await readData();
-  res.json(data);
-});
-
-app.post('/api/saveAll', async (req, res) => {
-  const payload = req.body;
-  if (!payload) return res.status(400).json({ error: 'No data provided' });
-  await writeData(payload);
-  res.json({ ok: true });
-});
-
-app.post('/api/products', async (req, res) => {
-  const data = await readData();
-  const product = req.body;
-  product.id = product.id || uuidv4();
-  data.products.push(product);
-  await writeData(data);
-  res.json(product);
-});
-
-app.put('/api/products/:id', async (req, res) => {
-  const id = req.params.id;
-  const data = await readData();
-  const idx = data.products.findIndex(p => String(p.id) === String(id));
-  if (idx === -1) return res.status(404).json({ error: 'Product not found' });
-  data.products[idx] = { ...data.products[idx], ...req.body };
-  await writeData(data);
-  res.json(data.products[idx]);
-});
-
-app.delete('/api/products/:id', async (req, res) => {
-  const id = req.params.id;
-  const data = await readData();
-  const before = data.products.length;
-  data.products = data.products.filter(p => String(p.id) !== String(id));
-  await writeData(data);
-  res.json({ deleted: before - data.products.length });
-});
-
-// 🆕 FUNCIONES DE STOCK AGREGADAS 🆕
-
-// Actualizar stock de un producto específico
-app.post('/api/update-stock', async (req, res) => {
-  try {
-    const { productId, newStock } = req.body;
-
-    // Validar datos
-    if (!productId || typeof newStock !== 'number' || newStock < 0) {
-      return res.status(400).json({ 
-        error: 'Datos inválidos. Se requiere productId y newStock válido' 
-      });
-    }
-
-    const data = await readData();
-
-    // Buscar producto por ID o nombre
-    const productIndex = data.products.findIndex(product => 
-      String(product.id) === String(productId) || 
-      product.name === productId
-    );
-
-    if (productIndex === -1) {
-      return res.status(404).json({ 
-        error: 'Producto no encontrado' 
-      });
-    }
-
-    // Guardar stock anterior
-    const oldStock = data.products[productIndex].stock || 0;
-    
-    // Actualizar stock
-    data.products[productIndex].stock = newStock;
-
-    // Guardar cambios
-    await writeData(data);
-
-    console.log(`📦 Stock actualizado para "${data.products[productIndex].name}": ${oldStock} → ${newStock}`);
-
-    res.json({
-      success: true,
-      productId,
-      productName: data.products[productIndex].name,
-      oldStock,
-      newStock,
-      message: 'Stock actualizado correctamente'
-    });
-
-  } catch (error) {
-    console.error('❌ Error actualizando stock:', error);
-    res.status(500).json({ 
-      error: 'Error interno del servidor',
-      details: error.message
-    });
-  }
-});
-
-// Obtener stock de un producto específico
-app.get('/api/stock/:productId', async (req, res) => {
-  try {
-    const { productId } = req.params;
-    
-    const data = await readData();
-    
-    const product = data.products.find(p => 
-      String(p.id) === String(productId) || 
-      p.name === productId
-    );
-    
-    if (!product) {
-      return res.status(404).json({ error: 'Producto no encontrado' });
-    }
-    
-    res.json({
-      productId,
-      productName: product.name,
-      stock: product.stock || 0,
-      price: product.price,
-      available: (product.stock || 0) > 0
-    });
-    
-  } catch (error) {
-    console.error('❌ Error obteniendo stock:', error);
-    res.status(500).json({ error: 'Error obteniendo stock' });
-  }
-});
-
-// 🆕 FIN FUNCIONES DE STOCK 🆕
-
-app.post('/api/upload', upload.array('images', 10), (req, res) => {
-  if (!req.files || req.files.length === 0)
-    return res.status(400).json({ error: 'No files' });
-  const urls = req.files.map(f => `/uploads/${f.filename}`);
-  res.json({ urls });
-});
-
+// ===============================
 // Archivos estáticos
+// ===============================
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use('/', express.static(PUBLIC_DIR));
 
-// Iniciar servidor
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log('Server running on port', PORT));
+// ===============================
+// Servidor
+// ===============================
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
