@@ -1,156 +1,127 @@
+// =======================
+// 📌 DEPENDENCIAS
+// =======================
 const express = require('express');
-const session = require('express-session');
 const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
+const { Pool } = require('pg');
+const bodyParser = require('body-parser');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// ===============================
-// Configuración de sesión
-// ===============================
-app.use(session({
-  secret: 'mi_secreto_super_seguro',
-  resave: false,
-  saveUninitialized: true,
-}));
+// Middleware
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// ===============================
-// Configuración de rutas
-// ===============================
-const DATA_FILE = path.join(__dirname, 'data.json');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-const PUBLIC_DIR = path.join(__dirname, 'public');
+// =======================
+// 📌 CONEXIÓN A POSTGRES (Railway lo da con DATABASE_URL)
+// =======================
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-// Credenciales (puedes cambiarlas si quieres)
-const USERNAME = "admin";
-const PASSWORD = "1234";
+// =======================
+// 📌 RUTAS ESTÁTICAS
+// =======================
+// Sirve la tienda
+app.use('/', express.static(path.join(__dirname, 'public')));
 
-// ===============================
-// Middleware para JSON
-// ===============================
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Sirve el panel de administración
+app.use('/admin', express.static(path.join(__dirname, 'admin')));
 
-// ===============================
-// Configuración de multer (subida de imágenes)
-// ===============================
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR);
-}
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+// =======================
+// 📌 API - PRODUCTOS Y CATEGORÍAS
+// =======================
+
+// Obtener todo (productos + categorías)
+app.get('/api/data', async (req, res) => {
+  try {
+    const products = await pool.query('SELECT * FROM products ORDER BY id DESC');
+    const categories = await pool.query('SELECT * FROM categories ORDER BY id ASC');
+
+    res.json({
+      products: products.rows,
+      categories: categories.rows,
+      discounts: [],
+      config: {
+        whatsapp: {
+          number: "929528308",
+          message: "Hola! Estoy interesado en {PRODUCT_NAME}, precio S/. {PRICE}"
+        }
+      }
+    });
+  } catch (err) {
+    console.error("❌ Error obteniendo datos:", err);
+    res.status(500).send("Error al obtener datos");
   }
 });
-const upload = multer({ storage });
 
-// ===============================
-// LOGIN
-// ===============================
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  if (username === USERNAME && password === PASSWORD) {
-    req.session.user = username;
+// Agregar producto
+app.post('/api/products', async (req, res) => {
+  const { name, shortDesc, price, category, discount, stock, images } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO products (name, shortDesc, price, category, discount, stock, images) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+      [name, shortDesc, price, category, discount, stock, images]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("❌ Error agregando producto:", err);
+    res.status(500).send("Error al agregar producto");
+  }
+});
+
+// Editar producto
+app.put('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, shortDesc, price, category, discount, stock, images } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE products SET name=$1, shortDesc=$2, price=$3, category=$4, discount=$5, stock=$6, images=$7 WHERE id=$8 RETURNING *',
+      [name, shortDesc, price, category, discount, stock, images, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("❌ Error editando producto:", err);
+    res.status(500).send("Error al editar producto");
+  }
+});
+
+// Eliminar producto
+app.delete('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM products WHERE id=$1', [id]);
     res.json({ success: true });
-  } else {
-    res.json({ success: false, message: "Credenciales inválidas" });
+  } catch (err) {
+    console.error("❌ Error eliminando producto:", err);
+    res.status(500).send("Error al eliminar producto");
   }
 });
 
-app.post('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.json({ success: true });
-  });
-});
+// =======================
+// 📌 API - CATEGORÍAS
+// =======================
 
-// ===============================
-// Middleware de autenticación
-// ===============================
-function requireLogin(req, res, next) {
-  if (req.session.user === USERNAME) {
-    next();
-  } else {
-    res.redirect('/login.html');
-  }
-}
-
-// ===============================
-// API de productos
-// ===============================
-app.get('/api/data', (req, res) => {
-  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  res.json(data);
-});
-
-app.post('/api/products', requireLogin, upload.single('image'), (req, res) => {
-  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  const newProduct = {
-    id: Date.now(),
-    name: req.body.name,
-    shortDesc: req.body.shortDesc || "",
-    price: parseFloat(req.body.price),
-    category: req.body.category,
-    discount: req.body.discount ? parseFloat(req.body.discount) : null,
-    stock: req.body.stock ? parseInt(req.body.stock) : 0,
-    images: req.file ? ["/uploads/" + req.file.filename] : []
-  };
-  data.products.push(newProduct);
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-  res.json(newProduct);
-});
-
-app.put('/api/products/:id', requireLogin, upload.single('image'), (req, res) => {
-  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  const productId = parseInt(req.params.id);
-  const product = data.products.find(p => p.id === productId);
-
-  if (product) {
-    product.name = req.body.name || product.name;
-    product.shortDesc = req.body.shortDesc || product.shortDesc;
-    product.price = req.body.price ? parseFloat(req.body.price) : product.price;
-    product.category = req.body.category || product.category;
-    product.discount = req.body.discount ? parseFloat(req.body.discount) : product.discount;
-    product.stock = req.body.stock ? parseInt(req.body.stock) : product.stock;
-    if (req.file) product.images = ["/uploads/" + req.file.filename];
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-    res.json(product);
-  } else {
-    res.status(404).json({ error: "Producto no encontrado" });
+// Agregar categoría
+app.post('/api/categories', async (req, res) => {
+  const { name, label } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO categories (name, label) VALUES ($1,$2) RETURNING *',
+      [name, label]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("❌ Error agregando categoría:", err);
+    res.status(500).send("Error al agregar categoría");
   }
 });
 
-app.delete('/api/products/:id', requireLogin, (req, res) => {
-  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  const productId = parseInt(req.params.id);
-  data.products = data.products.filter(p => p.id !== productId);
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-  res.json({ success: true });
-});
-
-// ===============================
-// Proteger carpeta admin
-// ===============================
-app.use('/admin', (req, res, next) => {
-  if (req.session.user === USERNAME) {
-    next();
-  } else {
-    res.redirect('/login.html');
-  }
-});
-
-// ===============================
-// Archivos estáticos
-// ===============================
-app.use('/uploads', express.static(UPLOADS_DIR));
-app.use('/', express.static(PUBLIC_DIR));
-
-// ===============================
-// Servidor
-// ===============================
+// =======================
+// 📌 INICIO SERVIDOR
+// =======================
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
 });
