@@ -418,11 +418,207 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.post('/logout', (req, res) => res.json({ success: true }));
 
 app.get('/api/test', (req, res) => {
-  res.json({ 
+  // Test original
+  const originalResponse = {
     success: true, 
     timestamp: new Date().toISOString(),
     message: "API funcionando correctamente"
-  });
+  };
+
+  // Si se pide diagnóstico específico
+  if (req.query.diagnostic === 'placeholder') {
+    const https = require('https');
+    
+    console.log('🔍 Testando via.placeholder.com desde /api/test...');
+    
+    const request = https.get('https://via.placeholder.com/40', (response) => {
+      let data = '';
+      
+      response.on('data', (chunk) => {
+        data += chunk;
+      });
+      
+      response.on('end', () => {
+        res.json({
+          ...originalResponse,
+          diagnostic: 'SUCCESS',
+          placeholderTest: '✅ via.placeholder.com ES ACCESIBLE desde Railway',
+          statusCode: response.statusCode,
+          contentLength: data.length,
+          conclusion: 'Si ves este mensaje, el problema NO es conectividad de Railway'
+        });
+      });
+    });
+
+    request.on('error', (error) => {
+      res.json({
+        ...originalResponse,
+        diagnostic: 'ERROR',
+        placeholderTest: '❌ via.placeholder.com NO ES ACCESIBLE desde Railway',
+        error: error.message,
+        code: error.code,
+        solution: 'ESTE ES EXACTAMENTE EL PROBLEMA DE LAS IMÁGENES!',
+        nextStep: 'Necesitas reemplazar via.placeholder.com con placeholders locales'
+      });
+    });
+
+    request.setTimeout(10000, () => {
+      request.destroy();
+      res.json({
+        ...originalResponse,
+        diagnostic: 'ERROR',
+        placeholderTest: '❌ TIMEOUT conectando a via.placeholder.com',
+        solution: 'Railway no puede conectarse a servicios externos'
+      });
+    });
+
+    return; // Importante: return aquí para no ejecutar el código de abajo
+  }
+
+  // Diagnóstico de DNS si se pide
+  if (req.query.diagnostic === 'dns') {
+    const dns = require('dns');
+    
+    dns.lookup('via.placeholder.com', (err, address, family) => {
+      if (err) {
+        res.json({
+          ...originalResponse,
+          diagnostic: 'DNS_ERROR',
+          dnsTest: '❌ No se puede resolver via.placeholder.com',
+          error: err.message,
+          code: err.code,
+          explanation: 'Railway no puede hacer DNS lookup de via.placeholder.com'
+        });
+      } else {
+        res.json({
+          ...originalResponse,
+          diagnostic: 'DNS_SUCCESS',
+          dnsTest: '✅ DNS resuelve via.placeholder.com correctamente',
+          address: address,
+          family: family,
+          note: 'DNS funciona, pero HTTP puede fallar'
+        });
+      }
+    });
+    return;
+  }
+
+  // Información del entorno si se pide
+  if (req.query.diagnostic === 'env') {
+    res.json({
+      ...originalResponse,
+      diagnostic: 'ENVIRONMENT',
+      environment: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        nodeEnv: process.env.NODE_ENV,
+        port: process.env.PORT,
+        railwayEnv: process.env.RAILWAY_ENVIRONMENT || 'Not set',
+        railwayProject: process.env.RAILWAY_PROJECT_NAME || 'Not set',
+        railwayService: process.env.RAILWAY_SERVICE_NAME || 'Not set'
+      },
+      uptime: process.uptime(),
+      memory: process.memoryUsage()
+    });
+    return;
+  }
+
+  // Página de diagnóstico si se pide
+  if (req.query.diagnostic === 'page') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>🔧 Diagnóstico via /api/test</title>
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          max-width: 900px; margin: 0 auto; padding: 20px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          min-height: 100vh; color: white;
+        }
+        .container {
+          background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+          border-radius: 15px; padding: 30px;
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        .btn {
+          background: linear-gradient(45deg, #667eea, #764ba2); color: white;
+          padding: 12px 24px; border: none; border-radius: 25px;
+          cursor: pointer; margin: 10px 5px; font-size: 14px;
+          text-decoration: none; display: inline-block;
+          box-shadow: 0 4px 15px 0 rgba(31, 38, 135, 0.4);
+          transition: all 0.3s ease;
+        }
+        .btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px 0 rgba(31, 38, 135, 0.6);
+        }
+        .result { 
+          background: rgba(0,0,0,0.2); padding: 20px; margin: 15px 0;
+          border-radius: 10px; border-left: 4px solid #ffd93d;
+        }
+        .success { border-left-color: #00ff88; }
+        .error { border-left-color: #ff6b6b; }
+        pre { 
+          background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px;
+          overflow-x: auto; font-size: 13px; color: #f8f9fa;
+        }
+        h1 { text-align: center; margin-bottom: 30px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🔧 Diagnóstico Hernandez Store</h1>
+        <p><strong>🌐 Host:</strong> ${req.get('host')}</p>
+        <p><strong>⏰ Hora:</strong> ${new Date().toLocaleString()}</p>
+        
+        <h3>🧪 Tests Disponibles:</h3>
+        <a href="/api/test?diagnostic=placeholder" class="btn">🖼️ Test Placeholder</a>
+        <a href="/api/test?diagnostic=dns" class="btn">🔍 Test DNS</a>
+        <a href="/api/test?diagnostic=env" class="btn">🌍 Info Entorno</a>
+        
+        <div id="results"></div>
+        
+        <div class="result">
+          <h3>🎯 ¿Qué estamos diagnosticando?</h3>
+          <p><strong>Problema:</strong> Imágenes de <code>via.placeholder.com</code> no cargan en Railway</p>
+          <p><strong>Error:</strong> <code>net::ERR_NAME_NOT_RESOLVED</code></p>
+          <p><strong>Funciona en:</strong> localhost ✅</p>
+          <p><strong>No funciona en:</strong> Railway ❌</p>
+        </div>
+        
+        <script>
+          // Auto-ejecutar test principal
+          fetch('/api/test?diagnostic=placeholder')
+            .then(r => r.json())
+            .then(data => {
+              const div = document.getElementById('results');
+              const isSuccess = data.diagnostic === 'SUCCESS';
+              div.innerHTML = 
+                '<div class="result ' + (isSuccess ? 'success' : 'error') + '">' +
+                '<h3>' + (isSuccess ? '✅' : '❌') + ' Resultado del Test</h3>' +
+                '<p><strong>' + data.placeholderTest + '</strong></p>' +
+                '<pre>' + JSON.stringify(data, null, 2) + '</pre>' +
+                '</div>';
+            })
+            .catch(err => {
+              document.getElementById('results').innerHTML = 
+                '<div class="result error"><h3>❌ Error</h3><p>' + err.message + '</p></div>';
+            });
+        </script>
+      </div>
+    </body>
+    </html>
+    `);
+    res.end();
+    return;
+  }
+
+  // Respuesta normal si no se pide diagnóstico
+  res.json(originalResponse);
 });
 
 // =======================
