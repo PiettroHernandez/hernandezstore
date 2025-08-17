@@ -425,6 +425,237 @@ app.get('/api/test', (req, res) => {
   });
 });
 
+// =======================
+// 📌 RUTAS DE DIAGNÓSTICO
+// =======================
+// 1. TEST BÁSICO - Verificar que las rutas funcionan
+app.get('/test-basic', (req, res) => {
+    res.json({
+        message: '✅ Rutas de diagnóstico funcionando',
+        timestamp: new Date().toISOString(),
+        server: 'Railway',
+        status: 'OK'
+    });
+});
+
+// 2. TEST DE CONECTIVIDAD A via.placeholder.com
+app.get('/test-placeholder', (req, res) => {
+    const https = require('https');
+    
+    const options = {
+        hostname: 'via.placeholder.com',
+        path: '/40',
+        method: 'GET',
+        timeout: 10000
+    };
+
+    const request = https.request(options, (response) => {
+        let data = '';
+        
+        response.on('data', chunk => {
+            data += chunk;
+        });
+        
+        response.on('end', () => {
+            res.json({
+                status: 'SUCCESS',
+                message: '✅ via.placeholder.com es accesible',
+                statusCode: response.statusCode,
+                headers: response.headers,
+                contentLength: data.length,
+                timestamp: new Date().toISOString()
+            });
+        });
+    });
+
+    request.on('error', (error) => {
+        res.json({
+            status: 'ERROR',
+            message: '❌ via.placeholder.com NO es accesible',
+            error: error.message,
+            code: error.code,
+            type: error.name,
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    request.on('timeout', () => {
+        request.destroy();
+        res.json({
+            status: 'ERROR',
+            message: '❌ Timeout conectando a via.placeholder.com',
+            error: 'Request timeout (10s)',
+            timestamp: new Date().toISOString()
+        });
+    });
+
+    request.end();
+});
+
+// 3. TEST DE DNS
+app.get('/test-dns-simple', (req, res) => {
+    const dns = require('dns');
+    
+    dns.lookup('via.placeholder.com', (err, address, family) => {
+        if (err) {
+            res.json({
+                status: 'ERROR',
+                message: '❌ No se puede resolver via.placeholder.com',
+                error: err.message,
+                code: err.code,
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            res.json({
+                status: 'SUCCESS',
+                message: '✅ DNS funciona correctamente',
+                domain: 'via.placeholder.com',
+                address: address,
+                family: family,
+                timestamp: new Date().toISOString()
+            });
+        }
+    });
+});
+
+// 4. TEST DE ARCHIVOS ESTÁTICOS
+app.get('/test-uploads', (req, res) => {
+    try {
+        const uploadsPath = path.join(__dirname, 'uploads');
+        const publicPath = path.join(__dirname, 'public');
+        
+        const result = {
+            message: '📁 Estado de archivos estáticos',
+            currentDir: __dirname,
+            uploadsPath: uploadsPath,
+            publicPath: publicPath,
+            uploadsExists: fs.existsSync(uploadsPath),
+            publicExists: fs.existsSync(publicPath),
+            uploadsFiles: [],
+            publicFiles: [],
+            timestamp: new Date().toISOString()
+        };
+        
+        if (result.uploadsExists) {
+            result.uploadsFiles = fs.readdirSync(uploadsPath).slice(0, 5);
+        }
+        
+        if (result.publicExists) {
+            result.publicFiles = fs.readdirSync(publicPath).slice(0, 5);
+        }
+        
+        res.json(result);
+        
+    } catch (error) {
+        res.json({
+            status: 'ERROR',
+            message: '❌ Error revisando archivos',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// 5. RESUMEN DE TODOS LOS TESTS
+app.get('/test-summary', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8'
+    });
+    
+    res.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>🔧 Diagnóstico Hernandez Store</title>
+        <style>
+            body { 
+                font-family: Arial, sans-serif; 
+                max-width: 1200px; 
+                margin: 0 auto; 
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            .test-card { 
+                background: white;
+                margin: 20px 0; 
+                padding: 20px; 
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .success { border-left: 4px solid #28a745; }
+            .error { border-left: 4px solid #dc3545; }
+            .loading { border-left: 4px solid #ffc107; }
+            pre { 
+                background: #f8f9fa; 
+                padding: 15px; 
+                border-radius: 4px;
+                overflow-x: auto;
+                font-size: 12px;
+            }
+            .btn {
+                background: #007bff;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>🔧 Diagnóstico de Conectividad - Hernandez Store</h1>
+        <p><strong>URL:</strong> ${req.get('host')}</p>
+        
+        <button class="btn" onclick="runAllTests()">🚀 Ejecutar Todos los Tests</button>
+        
+        <div id="results"></div>
+        
+        <script>
+            async function runTest(name, endpoint) {
+                const resultsDiv = document.getElementById('results');
+                const testId = 'test-' + name.replace(/\\s+/g, '-').toLowerCase();
+                
+                const card = document.createElement('div');
+                card.className = 'test-card loading';
+                card.id = testId;
+                card.innerHTML = '<h3>🔍 ' + name + ' - Ejecutando...</h3>';
+                resultsDiv.appendChild(card);
+                
+                try {
+                    const response = await fetch(endpoint);
+                    const data = await response.json();
+                    
+                    const isSuccess = data.status !== 'ERROR' && response.ok;
+                    card.className = 'test-card ' + (isSuccess ? 'success' : 'error');
+                    card.innerHTML = 
+                        '<h3>' + (isSuccess ? '✅' : '❌') + ' ' + name + '</h3>' +
+                        '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        
+                } catch (error) {
+                    card.className = 'test-card error';
+                    card.innerHTML = 
+                        '<h3>❌ ' + name + ' - Error de Conexión</h3>' +
+                        '<pre>Error: ' + error.message + '</pre>';
+                }
+            }
+            
+            async function runAllTests() {
+                document.getElementById('results').innerHTML = '';
+                
+                await runTest('Test Básico', '/test-basic');
+                await runTest('DNS Resolution', '/test-dns-simple');
+                await runTest('Conectividad HTTP', '/test-placeholder');
+                await runTest('Archivos Estáticos', '/test-uploads');
+            }
+        </script>
+    </body>
+    </html>
+    `);
+    
+    res.end();
+});
+
 // Manejo de errores 404
 app.use('*', (req, res) => {
   res.status(404).json({ 
@@ -440,261 +671,4 @@ app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
   console.log(`📱 Panel admin en: http://localhost:${PORT}/admin`);
   console.log(`🏪 Tienda en: http://localhost:${PORT}`);
-});
-// Agrega estos endpoints a tu servidor (app.js o routes)
-const dns = require('dns');
-const https = require('https');
-const http = require('http');
-
-// 1. Test de conectividad a via.placeholder.com
-app.get('/test-connection', async (req, res) => {
-    console.log('🔍 Testando conectividad a via.placeholder.com...');
-    
-    try {
-        // Usando fetch (si tienes node-fetch o versión Node 18+)
-        const response = await fetch('https://via.placeholder.com/40', {
-            method: 'GET',
-            timeout: 10000 // 10 segundos timeout
-        });
-        
-        res.json({ 
-            status: 'SUCCESS',
-            message: '✅ Conectividad exitosa',
-            statusCode: response.status,
-            statusText: response.statusText,
-            url: response.url,
-            headers: Object.fromEntries(response.headers.entries()),
-            timestamp: new Date().toISOString()
-        });
-        
-    } catch (error) {
-        console.error('❌ Error de conectividad:', error);
-        res.json({ 
-            status: 'ERROR',
-            message: '❌ Falló la conectividad',
-            error: error.message,
-            code: error.code,
-            type: error.name,
-            timestamp: new Date().toISOString()
-        });
-    }
-});
-
-// 2. Test de DNS resolution
-app.get('/test-dns', (req, res) => {
-    console.log('🔍 Testando resolución DNS...');
-    
-    const testDomains = [
-        'via.placeholder.com',
-        'google.com',
-        'github.com',
-        'railway.app'
-    ];
-    
-    const results = {};
-    let completed = 0;
-    
-    testDomains.forEach(domain => {
-        dns.lookup(domain, (err, address, family) => {
-            if (err) {
-                results[domain] = {
-                    status: 'ERROR',
-                    error: err.message,
-                    code: err.code
-                };
-            } else {
-                results[domain] = {
-                    status: 'SUCCESS',
-                    address: address,
-                    family: family
-                };
-            }
-            
-            completed++;
-            if (completed === testDomains.length) {
-                res.json({
-                    message: '🔍 Resultados de DNS',
-                    results: results,
-                    timestamp: new Date().toISOString()
-                });
-            }
-        });
-    });
-});
-
-// 3. Test de conectividad HTTP básica
-app.get('/test-http', (req, res) => {
-    console.log('🔍 Testando HTTP básico...');
-    
-    const testUrl = 'https://via.placeholder.com/40';
-    
-    https.get(testUrl, (response) => {
-        let data = '';
-        
-        response.on('data', (chunk) => {
-            data += chunk;
-        });
-        
-        response.on('end', () => {
-            res.json({
-                status: 'SUCCESS',
-                message: '✅ HTTP request exitoso',
-                statusCode: response.statusCode,
-                headers: response.headers,
-                contentLength: data.length,
-                timestamp: new Date().toISOString()
-            });
-        });
-        
-    }).on('error', (error) => {
-        res.json({
-            status: 'ERROR',
-            message: '❌ HTTP request falló',
-            error: error.message,
-            code: error.code,
-            timestamp: new Date().toISOString()
-        });
-    });
-});
-
-// 4. Test de información del entorno
-app.get('/test-environment', (req, res) => {
-    console.log('🔍 Información del entorno...');
-    
-    res.json({
-        message: '🌍 Información del entorno Railway',
-        environment: {
-            nodeVersion: process.version,
-            platform: process.platform,
-            arch: process.arch,
-            nodeEnv: process.env.NODE_ENV,
-            port: process.env.PORT,
-            railwayEnv: process.env.RAILWAY_ENVIRONMENT,
-            railwayProject: process.env.RAILWAY_PROJECT_NAME,
-            railwayService: process.env.RAILWAY_SERVICE_NAME
-        },
-        networkInterfaces: require('os').networkInterfaces(),
-        memory: process.memoryUsage(),
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString()
-    });
-});
-
-// 5. Test de archivos estáticos
-app.get('/test-static-files', (req, res) => {
-    const fs = require('fs');
-    const path = require('path');
-    
-    console.log('🔍 Testando archivos estáticos...');
-    
-    const uploadsPath = path.join(__dirname, 'uploads');
-    const publicPath = path.join(__dirname, 'public');
-    
-    const results = {
-        currentDirectory: __dirname,
-        uploadsPath: uploadsPath,
-        publicPath: publicPath,
-        uploadsExists: false,
-        publicExists: false,
-        uploadsFiles: [],
-        publicFiles: []
-    };
-    
-    try {
-        if (fs.existsSync(uploadsPath)) {
-            results.uploadsExists = true;
-            results.uploadsFiles = fs.readdirSync(uploadsPath).slice(0, 10); // Primeros 10 archivos
-        }
-    } catch (error) {
-        results.uploadsError = error.message;
-    }
-    
-    try {
-        if (fs.existsSync(publicPath)) {
-            results.publicExists = true;
-            results.publicFiles = fs.readdirSync(publicPath).slice(0, 10); // Primeros 10 archivos
-        }
-    } catch (error) {
-        results.publicError = error.message;
-    }
-    
-    res.json({
-        message: '📁 Estado de archivos estáticos',
-        results: results,
-        timestamp: new Date().toISOString()
-    });
-});
-
-// 6. Test completo - ejecuta todas las pruebas
-app.get('/test-all', async (req, res) => {
-    console.log('🔍 Ejecutando diagnóstico completo...');
-    
-    res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Access-Control-Allow-Origin': '*'
-    });
-    
-    res.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>🔧 Diagnóstico Railway - Hernandez Store</title>
-        <style>
-            body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #00ff00; }
-            .test { margin: 20px 0; padding: 15px; border: 1px solid #333; }
-            .success { border-color: #00ff00; }
-            .error { border-color: #ff0000; color: #ff6666; }
-            .info { border-color: #0099ff; color: #66ccff; }
-            pre { background: #333; padding: 10px; overflow-x: auto; }
-        </style>
-    </head>
-    <body>
-        <h1>🔧 Diagnóstico de Conectividad Railway</h1>
-        <p>Ejecutando pruebas... Por favor espera...</p>
-        <div id="results"></div>
-        
-        <script>
-            async function runTests() {
-                const results = document.getElementById('results');
-                const tests = [
-                    { name: 'DNS Resolution', url: '/test-dns' },
-                    { name: 'HTTP Connectivity', url: '/test-http' },
-                    { name: 'Fetch API', url: '/test-connection' },
-                    { name: 'Environment Info', url: '/test-environment' },
-                    { name: 'Static Files', url: '/test-static-files' }
-                ];
-                
-                for (const test of tests) {
-                    try {
-                        results.innerHTML += '<div class="test info">🔍 Ejecutando: ' + test.name + '...</div>';
-                        
-                        const response = await fetch(test.url);
-                        const data = await response.json();
-                        
-                        const className = data.status === 'ERROR' ? 'error' : 'success';
-                        const icon = data.status === 'ERROR' ? '❌' : '✅';
-                        
-                        results.innerHTML += '<div class="test ' + className + '">' +
-                            '<h3>' + icon + ' ' + test.name + '</h3>' +
-                            '<pre>' + JSON.stringify(data, null, 2) + '</pre>' +
-                            '</div>';
-                            
-                    } catch (error) {
-                        results.innerHTML += '<div class="test error">' +
-                            '<h3>❌ ' + test.name + ' - ERROR</h3>' +
-                            '<pre>' + error.message + '</pre>' +
-                            '</div>';
-                    }
-                }
-                
-                results.innerHTML += '<div class="test info"><h2>✅ Diagnóstico Completado</h2></div>';
-            }
-            
-            runTests();
-        </script>
-    </body>
-    </html>
-    `);
-    
-    res.end();
 });
