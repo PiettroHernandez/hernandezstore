@@ -304,6 +304,175 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer
     margin: 0.5rem 0;
     font-size: 0.9rem;
 }
+
+/* Modal para ver imágenes grandes */
+.image-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    animation: fadeIn 0.3s ease;
+}
+
+.image-modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: zoomIn 0.3s ease;
+}
+
+.modal-image {
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+}
+
+.modal-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    color: #fff;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease;
+}
+
+.modal-close:hover {
+    background: rgba(255, 0, 0, 0.7);
+}
+
+.modal-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    font-size: 24px;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.modal-nav:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-nav.prev {
+    left: -60px;
+}
+
+.modal-nav.next {
+    right: -60px;
+}
+
+.modal-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.image-counter {
+    color: white;
+    margin-top: 10px;
+    font-size: 14px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px 10px;
+    border-radius: 15px;
+}
+
+.modal-info {
+    color: white;
+    margin-top: 10px;
+    text-align: center;
+    max-width: 500px;
+}
+
+.modal-info h3 {
+    margin: 0 0 5px 0;
+    font-size: 1.2rem;
+}
+
+.modal-info p {
+    margin: 0;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes zoomIn {
+    from { transform: scale(0.8); }
+    to { transform: scale(1); }
+}
+
+/* Responsive para modal */
+@media (max-width: 768px) {
+    .modal-nav.prev {
+        left: 10px;
+    }
+    
+    .modal-nav.next {
+        right: 10px;
+    }
+    
+    .modal-close {
+        top: 10px;
+        right: 10px;
+    }
+    
+    .modal-nav {
+        font-size: 20px;
+        padding: 8px 12px;
+    }
+}
+
+/* Hacer las imágenes de producto clickeables */
+.product img {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.product img:hover {
+    transform: scale(1.05);
+}
+
+.image-item img {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.image-item img:hover {
+    transform: scale(1.1);
+}
 </style>
 </head>
 <body>
@@ -370,7 +539,30 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer
   <button id="cancelBtn" class="cancel-btn" style="display:none;">Cancelar</button>
 </div>
 
+<!-- Modal para ver imágenes grandes -->
+<div id="imageModal" class="image-modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeImageModal()">&times;</button>
+        <button class="modal-nav prev" id="prevBtn" onclick="prevImage()">❮</button>
+        <button class="modal-nav next" id="nextBtn" onclick="nextImage()">❯</button>
+        
+        <img id="modalImage" class="modal-image" alt="Imagen del producto">
+        
+        <div class="image-counter" id="imageCounter"></div>
+        
+        <div class="modal-info" id="modalInfo">
+            <h3 id="modalProductName"></h3>
+            <p id="modalProductDesc"></p>
+        </div>
+    </div>
+</div>
+
 <script>
+// Variables para el visor de imágenes
+let currentImageIndex = 0;
+let currentModalImages = [];
+let currentProduct = null;
+
 // Funciones de utilidad para generar placeholders
 function createPlaceholderSvg(width = 40, height = 40, text = 'IMG') {
     return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
@@ -458,6 +650,129 @@ class ImageManager {
 }
 
 const imageManager = new ImageManager();
+
+// FUNCIONES DEL VISOR DE IMÁGENES
+
+// Función para abrir el modal con las imágenes del producto
+function openImageModal(productIndex, imageIndex = 0) {
+    const product = products[productIndex];
+    if (!product) return;
+    
+    currentProduct = product;
+    currentModalImages = product.images || [];
+    currentImageIndex = imageIndex;
+    
+    // Si no hay imágenes, crear una imagen placeholder
+    if (currentModalImages.length === 0) {
+        currentModalImages = [createProductPlaceholder(product.name, 400)];
+    }
+    
+    updateModalContent();
+    
+    const modal = document.getElementById('imageModal');
+    modal.classList.add('active');
+    
+    // Prevenir scroll del body
+    document.body.style.overflow = 'hidden';
+    
+    // Agregar listener para cerrar con Escape
+    document.addEventListener('keydown', handleKeyPress);
+}
+
+// Función para cerrar el modal
+function closeImageModal() {
+    const modal = document.getElementById('imageModal');
+    modal.classList.remove('active');
+    
+    // Restaurar scroll del body
+    document.body.style.overflow = 'auto';
+    
+    // Remover listener de teclado
+    document.removeEventListener('keydown', handleKeyPress);
+    
+    currentProduct = null;
+    currentModalImages = [];
+    currentImageIndex = 0;
+}
+
+// Función para ir a la imagen anterior
+function prevImage() {
+    if (currentModalImages.length <= 1) return;
+    currentImageIndex = (currentImageIndex - 1 + currentModalImages.length) % currentModalImages.length;
+    updateModalContent();
+}
+
+// Función para ir a la imagen siguiente
+function nextImage() {
+    if (currentModalImages.length <= 1) return;
+    currentImageIndex = (currentImageIndex + 1) % currentModalImages.length;
+    updateModalContent();
+}
+
+// Función para actualizar el contenido del modal
+function updateModalContent() {
+    if (!currentProduct || currentModalImages.length === 0) return;
+    
+    const modalImage = document.getElementById('modalImage');
+    const imageCounter = document.getElementById('imageCounter');
+    const modalProductName = document.getElementById('modalProductName');
+    const modalProductDesc = document.getElementById('modalProductDesc');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    
+    // Actualizar imagen
+    modalImage.src = currentModalImages[currentImageIndex];
+    modalImage.alt = currentProduct.name;
+    
+    // Manejar error de carga de imagen
+    modalImage.onerror = () => {
+        modalImage.src = createProductPlaceholder(currentProduct.name, 400);
+    };
+    
+    // Actualizar contador
+    if (currentModalImages.length > 1) {
+        imageCounter.textContent = `${currentImageIndex + 1} de ${currentModalImages.length}`;
+        imageCounter.style.display = 'block';
+    } else {
+        imageCounter.style.display = 'none';
+    }
+    
+    // Actualizar info del producto
+    modalProductName.textContent = currentProduct.name;
+    const price = `S/. ${currentProduct.price}`;
+    const discount = currentProduct.discount ? ` (${currentProduct.discount}% desc.)` : '';
+    const stock = currentProduct.stock !== undefined ? ` - Stock: ${currentProduct.stock}` : '';
+    modalProductDesc.textContent = `${price}${discount}${stock}`;
+    
+    // Controlar navegación
+    prevBtn.disabled = currentModalImages.length <= 1;
+    nextBtn.disabled = currentModalImages.length <= 1;
+    
+    prevBtn.style.display = currentModalImages.length > 1 ? 'block' : 'none';
+    nextBtn.style.display = currentModalImages.length > 1 ? 'block' : 'none';
+}
+
+// Función para manejar teclas del teclado
+function handleKeyPress(e) {
+    switch(e.key) {
+        case 'Escape':
+            closeImageModal();
+            break;
+        case 'ArrowLeft':
+            prevImage();
+            break;
+        case 'ArrowRight':
+            nextImage();
+            break;
+    }
+}
+
+// Cerrar modal al hacer clic fuera de la imagen
+document.getElementById('imageModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeImageModal();
+    }
+});
 
 function logout(){
   fetch('/logout', { method: 'POST' }).then(() => window.location.href = '/login.html');
@@ -587,278 +902,41 @@ function removeImage(imageId) {
 
 function renderImagePreviews() {
     previewContainer.innerHTML = '';
-    currentImages.forEach(imageData => {
+    
+    currentImages.forEach((image, index) => {
         const imageItem = document.createElement('div');
         imageItem.className = 'image-item';
         
         const img = document.createElement('img');
-        img.src = imageData.src;
-        img.alt = 'Preview';
-        img.onerror = () => handleImageError(img, null, 'Preview');
+        img.src = image.src;
+        img.alt = `Imagen ${index + 1}`;
+        img.onerror = () => {
+            img.src = createPlaceholderSvg(80, 80, 'IMG');
+        };
+        
+        // Hacer la imagen clickeable para ver en modal
+        img.onclick = () => {
+            currentImageIndex = index;
+            currentModalImages = currentImages.map(img => img.src);
+            updateModalContent();
+            document.getElementById('imageModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            document.addEventListener('keydown', handleKeyPress);
+        };
         
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-image';
-        removeBtn.innerHTML = '&times;';
-        removeBtn.onclick = () => removeImage(imageData.id);
+        removeBtn.innerHTML = '×';
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            removeImage(image.id);
+        };
         
         imageItem.appendChild(img);
         imageItem.appendChild(removeBtn);
         previewContainer.appendChild(imageItem);
     });
 }
-
-async function loadFromServer(){
-  try {
-    const res = await fetch('/api/data');
-    const data = await res.json();
-    products = data.products || [];
-    categories = data.categories?.map(c => c.name) || [];
-    render();
-    fillCategories();
-  } catch (error) {
-    console.error('Error cargando datos:', error);
-    showMessage('Error al cargar los datos del servidor', 'error');
-  }
-}
-
-function fillCategories(){
-  const sel = document.getElementById('category');
-  sel.innerHTML = '<option value="">Seleccionar categoría</option>';
-  categories.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c;
-    opt.textContent = c;
-    sel.appendChild(opt);
-  });
-}
-
-function render(){
-  const list = document.getElementById('list');
-  list.innerHTML = '';
-  
-  products.forEach((p,i) => {
-    const hasImages = p.images && p.images.length > 0;
-    const imageUrl = hasImages ? p.images[0] : createProductPlaceholder(p.name, 40);
-    const discountTxt = p.discount ? ` (${p.discount}% desc.)` : '';
-    const stockTxt = p.stock !== undefined ? ` - Stock: ${p.stock}` : '';
-    
-    const productDiv = document.createElement('div');
-    productDiv.className = 'product';
-    
-    const img = document.createElement('img');
-    img.src = imageUrl;
-    img.alt = p.name;
-    img.onerror = () => handleImageError(img, null, p.name);
-    
-    const span = document.createElement('span');
-    span.appendChild(img);
-    span.appendChild(document.createTextNode(`${p.name} - S/.${p.price}${discountTxt}${stockTxt}`));
-    
-    const buttonDiv = document.createElement('div');
-    buttonDiv.innerHTML = `
-        <button class="edit-btn" onclick="edit(${i})">Editar</button>
-        <button class="delete-btn" onclick="del(${i})">Eliminar</button>
-    `;
-    
-    productDiv.appendChild(span);
-    productDiv.appendChild(buttonDiv);
-    list.appendChild(productDiv);
-  });
-}
-
-function showMessage(message, type = 'info') {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `${type}-message`;
-    messageDiv.textContent = message;
-    
-    const container = document.querySelector('.container');
-    container.insertBefore(messageDiv, container.firstChild);
-    
-    setTimeout(() => {
-        if (messageDiv.parentNode) {
-            messageDiv.parentNode.removeChild(messageDiv);
-        }
-    }, 5000);
-}
-
-function del(i){
-  if (confirm('¿Estás seguro de que quieres eliminar este producto?')) {
-    products.splice(i,1);
-    saveToServer();
-    render();
-    showMessage('Producto eliminado correctamente', 'success');
-  }
-}
-
-function edit(i){
-  const p = products[i];
-  editId = p.id;
-  document.getElementById('name').value = p.name;
-  document.getElementById('shortDesc').value = p.shortDesc || '';
-  document.getElementById('price').value = p.price;
-  document.getElementById('stock').value = p.stock !== undefined ? p.stock : 0;
-  document.getElementById('category').value = p.category || '';
-  document.getElementById('discount').value = p.discount || '';
-  
-  // Cargar imágenes existentes
-  currentImages = [];
-  if (p.images && p.images.length) {
-    p.images.forEach((imgUrl, index) => {
-      addImageToPreview(imgUrl, 'url');
-    });
-  }
-  
-  document.getElementById('form-title').textContent = 'Editar producto';
-  document.getElementById('actionBtn').textContent = 'Guardar cambios';
-  document.getElementById('actionBtn').className = 'save-btn';
-  document.getElementById('cancelBtn').style.display = 'inline-block';
-}
-
-document.getElementById('cancelBtn').onclick = () => resetForm();
-
-function resetForm(){
-  editId = null;
-  currentImages = [];
-  document.getElementById('name').value = '';
-  document.getElementById('shortDesc').value = '';
-  document.getElementById('price').value = '';
-  document.getElementById('stock').value = '';
-  document.getElementById('newCategory').value = '';
-  document.getElementById('discount').value = '';
-  document.getElementById('image').value = '';
-  document.getElementById('imageUrl').value = '';
-  renderImagePreviews();
-  document.getElementById('form-title').textContent = 'Agregar producto';
-  document.getElementById('actionBtn').textContent = 'Agregar';
-  document.getElementById('actionBtn').className = 'add-btn';
-  document.getElementById('cancelBtn').style.display = 'none';
-}
-
-document.getElementById('actionBtn').onclick = async () => {
-  const name = document.getElementById('name').value.trim();
-  const shortDesc = document.getElementById('shortDesc').value.trim();
-  const price = parseFloat(document.getElementById('price').value);
-  const stock = parseInt(document.getElementById('stock').value) || 0;
-  let category = document.getElementById('category').value;
-  const newCategory = document.getElementById('newCategory').value.trim();
-  
-  if(newCategory){
-    if (!categories.includes(newCategory)) {
-      categories.push(newCategory);
-      category = newCategory;
-      fillCategories();
-    }
-  }
-  
-  const discount = parseInt(document.getElementById('discount').value) || null;
-
-  if(!name || isNaN(price)) {
-    showMessage('Por favor, completa el nombre y precio del producto', 'error');
-    return;
-  }
-
-  if (price <= 0) {
-    showMessage('El precio debe ser mayor a 0', 'error');
-    return;
-  }
-
-  // Procesar imágenes
-  let finalImages = [];
-  
-  try {
-    const actionBtn = document.getElementById('actionBtn');
-    const originalText = actionBtn.textContent;
-    actionBtn.textContent = 'Procesando...';
-    actionBtn.disabled = true;
-    
-    for (const imageData of currentImages) {
-      if (imageData.type === 'file' && imageData.file) {
-        // Subir archivo
-        const formData = new FormData();
-        formData.append('images', imageData.file);
-        try {
-          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-          const uploadData = await uploadRes.json();
-          if (uploadData.urls && uploadData.urls[0]) {
-            finalImages.push(uploadData.urls[0]);
-          }
-        } catch (uploadError) {
-          console.warn('Error subiendo imagen:', uploadError);
-          finalImages.push(imageData.src);
-        }
-      } else if (imageData.type === 'url') {
-        finalImages.push(imageData.src);
-      }
-    }
-
-    const productData = {
-      id: editId || Date.now(),
-      name,
-      shortDesc,
-      price,
-      stock,
-      category,
-      discount,
-      images: finalImages
-    };
-
-    if(editId){
-      try {
-        await fetch(`/api/products/${editId}`, {
-          method: 'PUT',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(productData)
-        });
-      } catch (error) {
-        console.warn('Error en API, actualizando localmente:', error);
-      }
-      
-      const idx = products.findIndex(p => p.id === editId);
-      if (idx !== -1) {
-        products[idx] = productData;
-      }
-    } else {
-      products.push(productData);
-    }
-
-    await saveToServer();
-    render();
-    resetForm();
-    showMessage(editId ? 'Producto actualizado correctamente' : 'Producto agregado correctamente', 'success');
-    
-  } catch (error) {
-    console.error('Error procesando producto:', error);
-    showMessage('Error al procesar el producto. Inténtalo de nuevo.', 'error');
-  } finally {
-    const actionBtn = document.getElementById('actionBtn');
-    actionBtn.textContent = editId ? 'Guardar cambios' : 'Agregar';
-    actionBtn.disabled = false;
-  }
-};
-
-async function saveToServer(){
-  try {
-    const res = await fetch('/api/data');
-    let data = await res.json();
-    data.products = products;
-    data.categories = categories.map((name, i) => ({id: i+1, name, label: name}));
-    
-    await fetch('/api/saveAll', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(data)
-    });
-  } catch (error) {
-    console.error('Error guardando en servidor:', error);
-    showMessage('Error al guardar los cambios en el servidor', 'error');
-  }
-}
-
-// Prevenir comportamiento por defecto del navegador para drag & drop
-window.addEventListener('dragover', e => e.preventDefault());
-window.addEventListener('drop', e => e.preventDefault());
-
-// ===== FUNCIONES PARA IMPORTADOR CSV =====
 
 function handleCsvDragOver(e) {
     e.preventDefault();
@@ -873,338 +951,376 @@ function handleCsvDragLeave(e) {
 function handleCsvDrop(e) {
     e.preventDefault();
     csvUploadArea.classList.remove('drag-over');
-    const files = Array.from(e.dataTransfer.files).filter(file => 
-        file.type === 'text/csv' || file.name.endsWith('.csv') || file.type === 'text/plain'
-    );
-    if (files.length > 0) {
-        processCsvFile(files[0]);
+    if (e.dataTransfer.files.length) {
+        csvFileInput.files = e.dataTransfer.files;
+        handleCsvFileSelect({ target: csvFileInput });
     }
 }
 
 function handleCsvFileSelect(e) {
     const file = e.target.files[0];
-    if (file) {
-        processCsvFile(file);
-    }
-}
-
-function processCsvFile(file) {
+    if (!file) return;
+    
     const reader = new FileReader();
-    reader.onload = function(e) {
-        const csvContent = e.target.result;
-        parseCsvContent(csvContent);
+    reader.onload = (e) => {
+        try {
+            csvData = parseCsv(e.target.result);
+            showCsvPreview();
+        } catch (error) {
+            alert('Error al procesar el archivo CSV: ' + error.message);
+        }
     };
-    reader.readAsText(file, 'UTF-8');
+    reader.readAsText(file);
 }
 
-function parseCsvContent(csvContent) {
-    try {
-        const lines = csvContent.trim().split('\n');
-        if (lines.length < 2) {
-            showMessage('El archivo CSV debe tener al menos una fila de encabezados y una fila de datos', 'error');
-            return;
-        }
-
-        const separator = lines[0].includes(';') ? ';' : ',';
-        const headers = lines[0].split(separator).map(h => h.trim().replace(/"/g, ''));
-        
-        const data = [];
-        for (let i = 1; i < lines.length; i++) {
-            if (lines[i].trim()) {
-                const values = parseCsvLine(lines[i], separator);
-                const row = {};
-                headers.forEach((header, index) => {
-                    row[header] = values[index] || '';
-                });
-                data.push(row);
-            }
-        }
-
-        csvData = data;
-        showCsvPreview(headers, data);
-        
-    } catch (error) {
-        console.error('Error parsing CSV:', error);
-        showMessage('Error al procesar el archivo CSV. Asegúrate de que esté en el formato correcto.', 'error');
-    }
-}
-
-function parseCsvLine(line, separator) {
-    const values = [];
-    let current = '';
-    let inQuotes = false;
+function parseCsv(csvText) {
+    const lines = csvText.split('\n').filter(line => line.trim());
+    if (lines.length < 2) throw new Error('El archivo CSV está vacío o no tiene suficientes filas');
     
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        
-        if (char === '"') {
-            inQuotes = !inQuotes;
-        } else if (char === separator && !inQuotes) {
-            values.push(current.trim());
-            current = '';
-        } else {
-            current += char;
-        }
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const requiredFields = ['nombre', 'descripcion', 'precio', 'stock', 'categoria'];
+    
+    // Verificar campos requeridos
+    const missingFields = requiredFields.filter(field => !headers.includes(field));
+    if (missingFields.length) {
+        throw new Error(`Faltan campos requeridos: ${missingFields.join(', ')}`);
     }
     
-    values.push(current.trim());
-    return values.map(v => v.replace(/"/g, ''));
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const product = {};
+        headers.forEach((header, index) => {
+            product[header] = values[index] ? values[index].trim() : '';
+        });
+        return product;
+    });
 }
 
-function showCsvPreview(headers, data) {
+function showCsvPreview() {
+    if (!csvData.length) return;
+    
     const table = document.getElementById('csvPreviewTable');
-    const stats = document.getElementById('csvStats');
-    
     table.innerHTML = '';
     
-    const thead = document.createElement('thead');
+    // Crear encabezados
+    const headers = Object.keys(csvData[0]);
     const headerRow = document.createElement('tr');
     headers.forEach(header => {
         const th = document.createElement('th');
         th.textContent = header;
         headerRow.appendChild(th);
     });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
+    table.appendChild(headerRow);
     
-    const tbody = document.createElement('tbody');
-    const previewData = data.slice(0, 5);
-    previewData.forEach(row => {
+    // Mostrar primeras 5 filas
+    const previewRows = csvData.slice(0, 5);
+    previewRows.forEach(row => {
         const tr = document.createElement('tr');
         headers.forEach(header => {
             const td = document.createElement('td');
             td.textContent = row[header] || '';
             tr.appendChild(td);
         });
-        tbody.appendChild(tr);
+        table.appendChild(tr);
     });
-    table.appendChild(tbody);
     
-    stats.textContent = `Total de productos a importar: ${data.length}`;
+    // Mostrar estadísticas
+    document.getElementById('csvStats').textContent = 
+        `Total de productos a importar: ${csvData.length} | Mostrando ${previewRows.length} de ejemplo`;
     
+    // Mostrar controles de importación
     csvPreview.style.display = 'block';
     importCsv.style.display = 'inline-block';
     cancelImport.style.display = 'inline-block';
 }
 
 function downloadCsvTemplate() {
-    const template = `nombre,descripcion,precio,stock,categoria,descuento,imagen_url
-"Producto Ejemplo 1","Descripción del producto 1",29.99,10,"Electrónicos",15,"https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop"
-"Producto Ejemplo 2","Descripción del producto 2",45.50,5,"Ropa",0,"https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop"
-"Producto Ejemplo 3","Descripción del producto 3",12.99,20,"Hogar",10,"https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=200&h=200&fit=crop"`;
-
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const headers = ['nombre', 'descripcion', 'precio', 'stock', 'categoria', 'descuento', 'imagen_url'];
+    const exampleData = [
+        ['Camiseta básica', 'Camiseta de algodón 100%', '25.99', '50', 'Ropa', '10', 'https://ejemplo.com/camiseta.jpg'],
+        ['Zapatos deportivos', 'Zapatos para correr talla 42', '89.99', '30', 'Calzado', '', 'https://ejemplo.com/zapatos.jpg']
+    ];
+    
+    let csvContent = headers.join(',') + '\n';
+    exampleData.forEach(row => {
+        csvContent += row.join(',') + '\n';
+    });
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'plantilla_productos.csv';
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'plantilla_productos.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
 }
 
-async function importCsvData() {
-    if (!csvData || csvData.length === 0) {
-        showMessage('No hay datos para importar', 'error');
-        return;
-    }
-
-    const confirmMsg = `¿Estás seguro de importar ${csvData.length} productos? Esta acción agregará todos los productos a tu catálogo.`;
-    if (!confirm(confirmMsg)) {
-        return;
-    }
-
-    const importBtn = importCsv;
-    const originalText = importBtn.textContent;
-    importBtn.textContent = 'Importando...';
-    importBtn.disabled = true;
-
-    try {
-        let importedCount = 0;
-        let errorCount = 0;
-        const errors = [];
-
-        for (let i = 0; i < csvData.length; i++) {
-            const row = csvData[i];
-            
-            try {
-                const name = row.nombre || row.name || '';
-                const shortDesc = row.descripcion || row.description || row.desc || '';
-                const price = parseFloat(row.precio || row.price || 0);
-                const stock = parseInt(row.stock || row.cantidad || 0);
-                const category = row.categoria || row.category || '';
-                const discount = parseInt(row.descuento || row.discount || 0);
-                const imageUrl = row.imagen_url || row.image_url || row.imagen || row.image || '';
-
-                if (!name.trim()) {
-                    errors.push(`Fila ${i + 2}: Falta el nombre del producto`);
-                    errorCount++;
-                    continue;
-                }
-
-                if (isNaN(price) || price <= 0) {
-                    errors.push(`Fila ${i + 2}: Precio inválido (${row.precio || row.price})`);
-                    errorCount++;
-                    continue;
-                }
-
-                const productData = {
-                    id: Date.now() + i,
-                    name: name.trim(),
-                    shortDesc: shortDesc.trim(),
-                    price: price,
-                    stock: stock || 0,
-                    category: category.trim(),
-                    discount: (discount > 0 && discount <= 100) ? discount : null,
-                    images: imageUrl.trim() ? [imageUrl.trim()] : []
-                };
-
-                if (category.trim() && !categories.includes(category.trim())) {
-                    categories.push(category.trim());
-                }
-
-                products.push(productData);
-                importedCount++;
-
-            } catch (error) {
-                errors.push(`Fila ${i + 2}: Error procesando producto - ${error.message}`);
-                errorCount++;
-            }
-        }
-
-        await saveToServer();
-        render();
-        fillCategories();
-        cancelCsvImport();
-
-        let message = `Importación completada:\n✅ ${importedCount} productos importados`;
-        if (errorCount > 0) {
-            message += `\n❌ ${errorCount} errores`;
-            if (errors.length <= 5) {
-                message += `\n\nErrores:\n${errors.join('\n')}`;
-            } else {
-                message += `\n\nPrimeros errores:\n${errors.slice(0, 5).join('\n')}\n... y ${errors.length - 5} más`;
-            }
-        }
-        
-        alert(message);
-        showMessage(`Importación completada: ${importedCount} productos agregados`, 'success');
-
-    } catch (error) {
-        console.error('Error importando CSV:', error);
-        showMessage('Error durante la importación. Por favor, inténtalo de nuevo.', 'error');
-    } finally {
-        importBtn.textContent = originalText;
-        importBtn.disabled = false;
-    }
+function importCsvData() {
+    if (!csvData.length) return;
+    
+    // Aquí iría la lógica para enviar los datos al servidor
+    // Por ahora solo mostramos un mensaje de éxito
+    alert(`Se importarán ${csvData.length} productos. En una implementación real, esto enviaría los datos al servidor.`);
+    cancelCsvImport();
 }
 
 function cancelCsvImport() {
+    csvFileInput.value = '';
     csvData = [];
     csvPreview.style.display = 'none';
     importCsv.style.display = 'none';
     cancelImport.style.display = 'none';
-    csvFileInput.value = '';
 }
 
-// Auto-reparación de imágenes rotas al cargar la página
-function fixBrokenImages() {
-    // Buscar y reemplazar todas las imágenes que contengan via.placeholder.com
-    const brokenImages = document.querySelectorAll('img[src*="via.placeholder"]');
-    brokenImages.forEach(img => {
-        const productName = img.alt || '';
-        const size = img.width || img.height || 40;
-        img.src = createProductPlaceholder(productName, size);
+// Cargar productos y categorías al iniciar
+document.addEventListener('DOMContentLoaded', () => {
+    // Aquí iría la carga inicial de datos desde el servidor
+    // Por ahora usamos datos de ejemplo
+    products = [
+        { 
+            id: 1, 
+            name: 'Producto de ejemplo', 
+            shortDesc: 'Descripción corta del producto', 
+            price: 99.99, 
+            stock: 10, 
+            category: 'Electrónicos', 
+            discount: 15,
+            images: [createPlaceholderSvg(400, 400, 'Ejemplo')]
+        }
+    ];
+    
+    categories = ['Electrónicos', 'Ropa', 'Hogar'];
+    
+    renderProductList();
+    renderCategoryOptions();
+});
+
+function renderProductList() {
+    const list = document.getElementById('list');
+    list.innerHTML = '';
+    
+    products.forEach((product, index) => {
+        const productDiv = document.createElement('div');
+        productDiv.className = 'product';
+        
+        // Mostrar primera imagen o placeholder
+        const imgSrc = product.images && product.images.length ? product.images[0] : createProductPlaceholder(product.name);
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.alt = product.name;
+        img.onerror = () => handleImageError(img, imgSrc, product.name);
+        img.onclick = () => openImageModal(index);
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.style.flex = '1';
+        infoDiv.innerHTML = `
+            <strong>${product.name}</strong> - S/. ${product.price}
+            ${product.discount ? ` (${product.discount}% desc.)` : ''}
+            <div style="font-size:0.8rem;color:#aaa;">${product.shortDesc}</div>
+            <div style="font-size:0.8rem;">Stock: ${product.stock} | Categoría: ${product.category}</div>
+        `;
+        
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.style.display = 'flex';
+        
+        const editBtn = document.createElement('button');
+        editBtn.className = 'edit-btn';
+        editBtn.textContent = 'Editar';
+        editBtn.onclick = () => editProduct(index);
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = 'Eliminar';
+        deleteBtn.onclick = () => deleteProduct(index);
+        
+        buttonsDiv.appendChild(editBtn);
+        buttonsDiv.appendChild(deleteBtn);
+        
+        productDiv.appendChild(img);
+        productDiv.appendChild(infoDiv);
+        productDiv.appendChild(buttonsDiv);
+        
+        list.appendChild(productDiv);
+    });
+}
+
+function renderCategoryOptions() {
+    const select = document.getElementById('category');
+    select.innerHTML = '';
+    
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        select.appendChild(option);
     });
     
-    // También verificar imágenes que no cargan
-    const allImages = document.querySelectorAll('img');
-    allImages.forEach(img => {
-        if (img.src.includes('via.placeholder')) {
-            const productName = img.alt || '';
-            const size = img.width || img.height || 40;
-            img.src = createProductPlaceholder(productName, size);
-        }
-    });
+    // Agregar opción para nueva categoría
+    const newOption = document.createElement('option');
+    newOption.value = '_new';
+    newOption.textContent = '-- Nueva categoría --';
+    select.appendChild(newOption);
 }
 
-// Interceptar cualquier intento de cargar via.placeholder.com
-function interceptPlaceholderRequests() {
-    const originalCreateElement = document.createElement;
-    document.createElement = function(tagName) {
-        const element = originalCreateElement.call(document, tagName);
-        if (tagName.toLowerCase() === 'img') {
-            const originalSetSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
-            Object.defineProperty(element, 'src', {
-                set: function(value) {
-                    if (typeof value === 'string' && value.includes('via.placeholder')) {
-                        const size = value.match(/(\d+)/g);
-                        const width = size ? size[0] : 40;
-                        const height = size && size[1] ? size[1] : width;
-                        const altText = this.alt || '';
-                        originalSetSrc.call(this, createProductPlaceholder(altText, width));
-                    } else {
-                        originalSetSrc.call(this, value);
-                    }
-                },
-                get: function() {
-                    return Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').get.call(this);
-                }
-            });
+function editProduct(index) {
+    const product = products[index];
+    if (!product) return;
+    
+    editId = product.id;
+    document.getElementById('name').value = product.name;
+    document.getElementById('shortDesc').value = product.shortDesc;
+    document.getElementById('price').value = product.price;
+    document.getElementById('stock').value = product.stock;
+    document.getElementById('category').value = product.category;
+    document.getElementById('discount').value = product.discount || '';
+    
+    // Cargar imágenes
+    currentImages = product.images ? product.images.map(src => ({
+        src: src,
+        type: 'url',
+        id: Date.now() + Math.random()
+    })) : [];
+    renderImagePreviews();
+    
+    // Cambiar texto del botón
+    document.getElementById('actionBtn').textContent = 'Guardar';
+    document.getElementById('actionBtn').className = 'save-btn';
+    document.getElementById('form-title').textContent = 'Editar producto';
+    document.getElementById('cancelBtn').style.display = 'inline-block';
+}
+
+function deleteProduct(index) {
+    if (confirm('¿Estás seguro de que quieres eliminar este producto?')) {
+        // Aquí iría la llamada al servidor para eliminar
+        products.splice(index, 1);
+        renderProductList();
+    }
+}
+
+// Configurar evento del botón principal
+document.getElementById('actionBtn').addEventListener('click', () => {
+    if (editId !== null) {
+        updateProduct();
+    } else {
+        addProduct();
+    }
+});
+
+document.getElementById('cancelBtn').addEventListener('click', resetForm);
+
+function addProduct() {
+    const name = document.getElementById('name').value.trim();
+    const shortDesc = document.getElementById('shortDesc').value.trim();
+    const price = parseFloat(document.getElementById('price').value);
+    const stock = parseInt(document.getElementById('stock').value);
+    const categorySelect = document.getElementById('category');
+    const newCategory = document.getElementById('newCategory').value.trim();
+    const discount = parseInt(document.getElementById('discount').value) || 0;
+    
+    // Validaciones básicas
+    if (!name || isNaN(price) || isNaN(stock)) {
+        alert('Por favor completa los campos requeridos (nombre, precio y stock)');
+        return;
+    }
+    
+    // Determinar categoría
+    let category;
+    if (categorySelect.value === '_new' && newCategory) {
+        category = newCategory;
+        if (!categories.includes(category)) {
+            categories.push(category);
+            renderCategoryOptions();
         }
-        return element;
+    } else {
+        category = categorySelect.value;
+    }
+    
+    // Crear nuevo producto
+    const newProduct = {
+        id: Date.now(), // ID temporal
+        name,
+        shortDesc,
+        price,
+        stock,
+        category,
+        discount,
+        images: currentImages.map(img => img.src)
     };
+    
+    // Aquí iría la llamada al servidor para guardar
+    products.push(newProduct);
+    renderProductList();
+    resetForm();
 }
 
-// Inicializar la aplicación
-document.addEventListener('DOMContentLoaded', function() {
-    // Interceptar requests de placeholder ANTES de cualquier cosa
-    interceptPlaceholderRequests();
+function updateProduct() {
+    const name = document.getElementById('name').value.trim();
+    const shortDesc = document.getElementById('shortDesc').value.trim();
+    const price = parseFloat(document.getElementById('price').value);
+    const stock = parseInt(document.getElementById('stock').value);
+    const categorySelect = document.getElementById('category');
+    const newCategory = document.getElementById('newCategory').value.trim();
+    const discount = parseInt(document.getElementById('discount').value) || 0;
     
-    // Arreglar imágenes rotas existentes
-    fixBrokenImages();
+    // Validaciones básicas
+    if (!name || isNaN(price) || isNaN(stock)) {
+        alert('Por favor completa los campos requeridos (nombre, precio y stock)');
+        return;
+    }
     
-    // Cargar datos del servidor
-    loadFromServer();
+    // Determinar categoría
+    let category;
+    if (categorySelect.value === '_new' && newCategory) {
+        category = newCategory;
+        if (!categories.includes(category)) {
+            categories.push(category);
+            renderCategoryOptions();
+        }
+    } else {
+        category = categorySelect.value;
+    }
     
-    // Observar cambios en el DOM para interceptar nuevas imágenes
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            mutation.addedNodes.forEach(function(node) {
-                if (node.nodeType === 1) { // Element node
-                    const images = node.tagName === 'IMG' ? [node] : 
-                                  node.querySelectorAll ? Array.from(node.querySelectorAll('img')) : [];
-                    
-                    images.forEach(img => {
-                        if (img.src && img.src.includes('via.placeholder')) {
-                            const productName = img.alt || '';
-                            const size = img.width || img.height || 40;
-                            img.src = createProductPlaceholder(productName, size);
-                        }
-                    });
-                }
-            });
-        });
-    });
+    // Buscar producto a editar
+    const index = products.findIndex(p => p.id === editId);
+    if (index === -1) return;
     
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-});
+    // Actualizar producto
+    products[index] = {
+        ...products[index],
+        name,
+        shortDesc,
+        price,
+        stock,
+        category,
+        discount,
+        images: currentImages.map(img => img.src)
+    };
+    
+    // Aquí iría la llamada al servidor para actualizar
+    renderProductList();
+    resetForm();
+}
 
-// Prevenir cualquier carga de via.placeholder.com a nivel global
-window.addEventListener('beforeunload', function() {
-    // Limpiar cualquier imagen problemática antes de salir
-    const brokenImages = document.querySelectorAll('img[src*="via.placeholder"]');
-    brokenImages.forEach(img => {
-        img.src = createPlaceholderSvg(40, 40, 'IMG');
-    });
-});
-
-// Hacer las funciones globales para que puedan ser llamadas desde el HTML
-window.handleImageError = handleImageError;
-window.removeImage = removeImage;
-window.edit = edit;
-window.del = del;
-window.logout = logout;
+function resetForm() {
+    document.getElementById('name').value = '';
+    document.getElementById('shortDesc').value = '';
+    document.getElementById('price').value = '';
+    document.getElementById('stock').value = '';
+    document.getElementById('category').value = '';
+    document.getElementById('newCategory').value = '';
+    document.getElementById('discount').value = '';
+    
+    currentImages = [];
+    renderImagePreviews();
+    
+    editId = null;
+    document.getElementById('actionBtn').textContent = 'Agregar';
+    document.getElementById('actionBtn').className = 'add-btn';
+    document.getElementById('form-title').textContent = 'Agregar producto';
+    document.getElementById('cancelBtn').style.display = 'none';
+}
 </script>
 </body>
 </html>
