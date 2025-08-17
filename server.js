@@ -426,6 +426,217 @@ app.get('/api/test', (req, res) => {
 });
 
 // =======================
+// 📌 RUTAS DE DIAGNÓSTICO (VERSIÓN SIMPLIFICADA)
+// =======================
+
+// 1. TEST SIMPLE DE CONECTIVIDAD
+app.get('/test-debug', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: "✅ Ruta de debug funcionando",
+    timestamp: new Date().toISOString(),
+    server: "Railway",
+    nodeVersion: process.version,
+    environment: process.env.NODE_ENV
+  });
+});
+
+// 2. TEST DE via.placeholder.com (EL MÁS IMPORTANTE)
+app.get('/test-placeholder-simple', (req, res) => {
+  const https = require('https');
+  
+  console.log('🔍 Testando via.placeholder.com...');
+  
+  const request = https.get('https://via.placeholder.com/40', (response) => {
+    let data = '';
+    
+    response.on('data', (chunk) => {
+      data += chunk;
+    });
+    
+    response.on('end', () => {
+      console.log('✅ via.placeholder.com respondió correctamente');
+      res.json({
+        status: 'SUCCESS',
+        message: '✅ via.placeholder.com ES ACCESIBLE desde Railway',
+        statusCode: response.statusCode,
+        contentLength: data.length,
+        timestamp: new Date().toISOString()
+      });
+    });
+  });
+
+  request.on('error', (error) => {
+    console.error('❌ Error conectando a via.placeholder.com:', error);
+    res.json({
+      status: 'ERROR', 
+      message: '❌ via.placeholder.com NO ES ACCESIBLE desde Railway',
+      error: error.message,
+      code: error.code,
+      reason: 'Este es el problema de las imágenes!',
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  request.setTimeout(10000, () => {
+    request.destroy();
+    res.json({
+      status: 'ERROR',
+      message: '❌ TIMEOUT - via.placeholder.com muy lento',
+      timestamp: new Date().toISOString()
+    });
+  });
+});
+
+// 3. PÁGINA DE DIAGNÓSTICO COMPLETA
+app.get('/diagnostico', (req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  
+  res.write(`
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>🔧 Diagnóstico Hernandez Store</title>
+    <style>
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        max-width: 800px; 
+        margin: 0 auto; 
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        color: white;
+      }
+      .container {
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+      }
+      .test-card { 
+        background: rgba(255,255,255,0.1);
+        margin: 15px 0; 
+        padding: 20px; 
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.2);
+      }
+      .success { border-left: 4px solid #00ff88; }
+      .error { border-left: 4px solid #ff6b6b; }
+      .loading { border-left: 4px solid #ffd93d; }
+      pre { 
+        background: rgba(0,0,0,0.3); 
+        padding: 15px; 
+        border-radius: 8px;
+        overflow-x: auto;
+        font-size: 13px;
+        color: #f8f9fa;
+      }
+      .btn {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        margin: 10px 5px;
+        font-size: 14px;
+        box-shadow: 0 4px 15px 0 rgba(31, 38, 135, 0.4);
+        transition: all 0.3s ease;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px 0 rgba(31, 38, 135, 0.6);
+      }
+      h1 { text-align: center; margin-bottom: 30px; }
+      .status-ok { color: #00ff88; }
+      .status-error { color: #ff6b6b; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔧 Diagnóstico Hernandez Store</h1>
+      <p><strong>🌐 URL:</strong> ${req.get('host')}</p>
+      <p><strong>⏰ Hora:</strong> ${new Date().toLocaleString()}</p>
+      
+      <button class="btn" onclick="runBasicTest()">🧪 Test Básico</button>
+      <button class="btn" onclick="runPlaceholderTest()">🖼️ Test Imágenes Placeholder</button>
+      <button class="btn" onclick="runAllTests()">🚀 Ejecutar Todos</button>
+      
+      <div id="results"></div>
+      
+      <div class="test-card">
+        <h3>🎯 Objetivo del Diagnóstico</h3>
+        <p>Identificar por qué las imágenes de <code>via.placeholder.com</code> no cargan en Railway pero sí en localhost.</p>
+        <p><strong>Errores reportados:</strong> <code>net::ERR_NAME_NOT_RESOLVED</code></p>
+      </div>
+    </div>
+    
+    <script>
+      async function runTest(name, endpoint, description) {
+        const resultsDiv = document.getElementById('results');
+        
+        const card = document.createElement('div');
+        card.className = 'test-card loading';
+        card.innerHTML = 
+          '<h3>🔍 ' + name + '</h3>' +
+          '<p>' + description + '</p>' +
+          '<p>⏳ Ejecutando...</p>';
+        resultsDiv.appendChild(card);
+        
+        try {
+          const response = await fetch(endpoint);
+          const data = await response.json();
+          
+          const isSuccess = data.status !== 'ERROR' && data.success !== false;
+          card.className = 'test-card ' + (isSuccess ? 'success' : 'error');
+          
+          const statusIcon = isSuccess ? '✅' : '❌';
+          const statusClass = isSuccess ? 'status-ok' : 'status-error';
+          
+          card.innerHTML = 
+            '<h3>' + statusIcon + ' ' + name + '</h3>' +
+            '<p>' + description + '</p>' +
+            '<p class="' + statusClass + '"><strong>' + (data.message || 'Sin mensaje') + '</strong></p>' +
+            '<details><summary>Ver detalles técnicos</summary><pre>' + 
+            JSON.stringify(data, null, 2) + '</pre></details>';
+            
+        } catch (error) {
+          card.className = 'test-card error';
+          card.innerHTML = 
+            '<h3>❌ ' + name + ' - Error de Conexión</h3>' +
+            '<p>' + description + '</p>' +
+            '<p class="status-error"><strong>Error: ' + error.message + '</strong></p>';
+        }
+      }
+      
+      async function runBasicTest() {
+        document.getElementById('results').innerHTML = '';
+        await runTest('Conectividad Básica', '/test-debug', 
+          'Verifica que las rutas de diagnóstico funcionen correctamente');
+      }
+      
+      async function runPlaceholderTest() {
+        document.getElementById('results').innerHTML = '';
+        await runTest('Acceso a via.placeholder.com', '/test-placeholder-simple', 
+          'Prueba si Railway puede conectarse a via.placeholder.com (causa de los errores)');
+      }
+      
+      async function runAllTests() {
+        document.getElementById('results').innerHTML = '';
+        await runBasicTest();
+        await new Promise(r => setTimeout(r, 500));
+        await runPlaceholderTest();
+      }
+    </script>
+  </body>
+  </html>
+  `);
+  
+  res.end();
+});
+
+// =======================
 // 📌 RUTAS DE DIAGNÓSTICO
 // =======================
 // 1. TEST BÁSICO - Verificar que las rutas funcionan
