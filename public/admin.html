@@ -21,6 +21,23 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer
 .product img { max-height: 40px; margin-right: 10px; border-radius: 4px; }
 .img-preview { max-height: 120px; margin-top: 10px; display: block; border-radius: 8px; border: 2px solid #333; }
 
+/* Estilos para imagen de fallback */
+.no-image-placeholder {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #444, #222);
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    color: #999;
+    font-size: 10px;
+    text-align: center;
+    font-weight: bold;
+    border: 1px solid #555;
+}
+
 /* Zona de arrastrar y soltar */
 .image-upload-area {
     border: 2px dashed #555;
@@ -256,6 +273,37 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer
     font-size: 0.9rem;
     margin: 0.5rem 0;
 }
+
+/* Mensaje de error de imagen */
+.image-error {
+    color: #ff6b6b;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+/* Estado de carga */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.error-message {
+    background: #ff4444;
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.success-message {
+    background: #4CAF50;
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+}
 </style>
 </head>
 <body>
@@ -303,7 +351,7 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer
   
   <!-- Nueva área de carga de imágenes -->
   <div class="image-upload-area" id="uploadArea">
-    <div class="upload-icon">📁</div>
+    <div class="upload-icon">🖼️</div>
     <div class="upload-text">Arrastra y suelta imágenes aquí</div>
     <div class="upload-subtext">o haz clic para seleccionar archivos</div>
   </div>
@@ -323,6 +371,94 @@ button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer
 </div>
 
 <script>
+// Funciones de utilidad para generar placeholders
+function createPlaceholderSvg(width = 40, height = 40, text = 'IMG') {
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#333"/>
+            <rect width="100%" height="100%" fill="url(#gradient)" opacity="0.8"/>
+            <defs>
+                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#444;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#222;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" 
+                  fill="#999" font-family="Arial" font-size="${Math.min(width/4, 12)}" font-weight="bold">${text}</text>
+        </svg>
+    `)}`;
+}
+
+function createProductPlaceholder(productName = '', size = 40) {
+    const initials = productName.split(' ')
+        .map(word => word.trim()[0])
+        .filter(letter => letter)
+        .join('')
+        .substring(0, 2)
+        .toUpperCase() || 'P';
+    
+    const colors = ['#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#F44336', '#00BCD4'];
+    const color = colors[productName.length % colors.length];
+    
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+        <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50%" cy="50%" r="45%" fill="${color}"/>
+            <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" 
+                  fill="white" font-family="Arial" font-size="${Math.min(size/2.5, 16)}" font-weight="bold">${initials}</text>
+        </svg>
+    `)}`;
+}
+
+// Sistema mejorado de manejo de imágenes - SIN via.placeholder.com
+class ImageManager {
+    constructor() {
+        this.retryCount = new Map();
+        this.maxRetries = 1;
+    }
+
+    handleImageError(img, originalSrc, productName = '') {
+        // Directamente usar placeholder sin intentar URLs externas problemáticas
+        this.replaceWithPlaceholder(img, productName);
+    }
+
+    extractSizeFromUrl(url) {
+        const match = url.match(/(\d+)/);
+        return match ? parseInt(match[0]) : 40;
+    }
+
+    replaceWithPlaceholder(img, productName = '') {
+        const size = img.width || img.height || 40;
+        const placeholder = document.createElement('div');
+        placeholder.className = 'no-image-placeholder';
+        placeholder.style.width = size + 'px';
+        placeholder.style.height = size + 'px';
+        placeholder.textContent = productName ? 
+            productName.substring(0, 2).toUpperCase() : 'IMG';
+        
+        if (img.parentNode) {
+            img.parentNode.replaceChild(placeholder, img);
+        }
+    }
+
+    loadImage(src, alt = '', className = '', productName = '') {
+        return new Promise((resolve, reject) => {
+            const img = document.createElement('img');
+            img.alt = alt;
+            img.className = className;
+            
+            img.onload = () => resolve(img);
+            img.onerror = () => {
+                this.handleImageError(img, src, productName);
+                resolve(img); // Resolver aunque haya error, porque manejamos el fallback
+            };
+            
+            img.src = src;
+        });
+    }
+}
+
+const imageManager = new ImageManager();
+
 function logout(){
   fetch('/logout', { method: 'POST' }).then(() => window.location.href = '/login.html');
 }
@@ -365,6 +501,11 @@ csvFileInput.addEventListener('change', handleCsvFileSelect);
 downloadTemplate.addEventListener('click', downloadCsvTemplate);
 importCsv.addEventListener('click', importCsvData);
 cancelImport.addEventListener('click', cancelCsvImport);
+
+// Función mejorada para manejar errores de imagen
+function handleImageError(img, fallbackUrl = null, productName = '') {
+    imageManager.handleImageError(img, img.src, productName);
+}
 
 function handleDragOver(e) {
     e.preventDefault();
@@ -413,7 +554,15 @@ function addImageUrl() {
 function isValidImageUrl(url) {
     try {
         new URL(url);
-        return /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url) || url.includes('placeholder') || url.includes('unsplash') || url.includes('imgur');
+        return /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url) || 
+               url.includes('unsplash') || 
+               url.includes('imgur') ||
+               url.includes('picsum') ||
+               url.includes('images.unsplash') ||
+               url.startsWith('data:image/') ||
+               url.startsWith('/') || // URLs relativas
+               url.includes('cloudinary') ||
+               url.includes('amazonaws');
     } catch {
         return false;
     }
@@ -441,10 +590,19 @@ function renderImagePreviews() {
     currentImages.forEach(imageData => {
         const imageItem = document.createElement('div');
         imageItem.className = 'image-item';
-        imageItem.innerHTML = `
-            <img src="${imageData.src}" alt="Preview">
-            <button class="remove-image" onclick="removeImage(${imageData.id})">&times;</button>
-        `;
+        
+        const img = document.createElement('img');
+        img.src = imageData.src;
+        img.alt = 'Preview';
+        img.onerror = () => handleImageError(img, null, 'Preview');
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-image';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.onclick = () => removeImage(imageData.id);
+        
+        imageItem.appendChild(img);
+        imageItem.appendChild(removeBtn);
         previewContainer.appendChild(imageItem);
     });
 }
@@ -459,7 +617,7 @@ async function loadFromServer(){
     fillCategories();
   } catch (error) {
     console.error('Error cargando datos:', error);
-    alert('Error al cargar los datos del servidor');
+    showMessage('Error al cargar los datos del servidor', 'error');
   }
 }
 
@@ -477,18 +635,50 @@ function fillCategories(){
 function render(){
   const list = document.getElementById('list');
   list.innerHTML = '';
+  
   products.forEach((p,i) => {
-    const img = p.images && p.images.length ? p.images[0] : 'https://via.placeholder.com/40';
+    const hasImages = p.images && p.images.length > 0;
+    const imageUrl = hasImages ? p.images[0] : createProductPlaceholder(p.name, 40);
     const discountTxt = p.discount ? ` (${p.discount}% desc.)` : '';
     const stockTxt = p.stock !== undefined ? ` - Stock: ${p.stock}` : '';
-    list.innerHTML += `<div class="product">
-      <span><img src="${img}" onerror="this.src='https://via.placeholder.com/40'">${p.name} - S/.${p.price}${discountTxt}${stockTxt}</span>
-      <div>
+    
+    const productDiv = document.createElement('div');
+    productDiv.className = 'product';
+    
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.alt = p.name;
+    img.onerror = () => handleImageError(img, null, p.name);
+    
+    const span = document.createElement('span');
+    span.appendChild(img);
+    span.appendChild(document.createTextNode(`${p.name} - S/.${p.price}${discountTxt}${stockTxt}`));
+    
+    const buttonDiv = document.createElement('div');
+    buttonDiv.innerHTML = `
         <button class="edit-btn" onclick="edit(${i})">Editar</button>
         <button class="delete-btn" onclick="del(${i})">Eliminar</button>
-      </div>
-    </div>`;
+    `;
+    
+    productDiv.appendChild(span);
+    productDiv.appendChild(buttonDiv);
+    list.appendChild(productDiv);
   });
+}
+
+function showMessage(message, type = 'info') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `${type}-message`;
+    messageDiv.textContent = message;
+    
+    const container = document.querySelector('.container');
+    container.insertBefore(messageDiv, container.firstChild);
+    
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.parentNode.removeChild(messageDiv);
+        }
+    }, 5000);
 }
 
 function del(i){
@@ -496,6 +686,7 @@ function del(i){
     products.splice(i,1);
     saveToServer();
     render();
+    showMessage('Producto eliminado correctamente', 'success');
   }
 }
 
@@ -512,7 +703,7 @@ function edit(i){
   // Cargar imágenes existentes
   currentImages = [];
   if (p.images && p.images.length) {
-    p.images.forEach(imgUrl => {
+    p.images.forEach((imgUrl, index) => {
       addImageToPreview(imgUrl, 'url');
     });
   }
@@ -562,12 +753,12 @@ document.getElementById('actionBtn').onclick = async () => {
   const discount = parseInt(document.getElementById('discount').value) || null;
 
   if(!name || isNaN(price)) {
-    alert('Por favor, completa el nombre y precio del producto');
+    showMessage('Por favor, completa el nombre y precio del producto', 'error');
     return;
   }
 
   if (price <= 0) {
-    alert('El precio debe ser mayor a 0');
+    showMessage('El precio debe ser mayor a 0', 'error');
     return;
   }
 
@@ -575,8 +766,10 @@ document.getElementById('actionBtn').onclick = async () => {
   let finalImages = [];
   
   try {
-    document.getElementById('actionBtn').textContent = 'Procesando...';
-    document.getElementById('actionBtn').disabled = true;
+    const actionBtn = document.getElementById('actionBtn');
+    const originalText = actionBtn.textContent;
+    actionBtn.textContent = 'Procesando...';
+    actionBtn.disabled = true;
     
     for (const imageData of currentImages) {
       if (imageData.type === 'file' && imageData.file) {
@@ -591,11 +784,9 @@ document.getElementById('actionBtn').onclick = async () => {
           }
         } catch (uploadError) {
           console.warn('Error subiendo imagen:', uploadError);
-          // Si falla la subida, usar la URL de datos
           finalImages.push(imageData.src);
         }
       } else if (imageData.type === 'url') {
-        // Usar URL directamente
         finalImages.push(imageData.src);
       }
     }
@@ -612,7 +803,6 @@ document.getElementById('actionBtn').onclick = async () => {
     };
 
     if(editId){
-      // Actualizar producto existente
       try {
         await fetch(`/api/products/${editId}`, {
           method: 'PUT',
@@ -628,21 +818,21 @@ document.getElementById('actionBtn').onclick = async () => {
         products[idx] = productData;
       }
     } else {
-      // Agregar nuevo producto
       products.push(productData);
     }
 
     await saveToServer();
     render();
     resetForm();
-    alert(editId ? 'Producto actualizado correctamente' : 'Producto agregado correctamente');
+    showMessage(editId ? 'Producto actualizado correctamente' : 'Producto agregado correctamente', 'success');
     
   } catch (error) {
     console.error('Error procesando producto:', error);
-    alert('Error al procesar el producto. Inténtalo de nuevo.');
+    showMessage('Error al procesar el producto. Inténtalo de nuevo.', 'error');
   } finally {
-    document.getElementById('actionBtn').textContent = editId ? 'Guardar cambios' : 'Agregar';
-    document.getElementById('actionBtn').disabled = false;
+    const actionBtn = document.getElementById('actionBtn');
+    actionBtn.textContent = editId ? 'Guardar cambios' : 'Agregar';
+    actionBtn.disabled = false;
   }
 };
 
@@ -660,16 +850,13 @@ async function saveToServer(){
     });
   } catch (error) {
     console.error('Error guardando en servidor:', error);
-    alert('Error al guardar los cambios en el servidor');
+    showMessage('Error al guardar los cambios en el servidor', 'error');
   }
 }
 
 // Prevenir comportamiento por defecto del navegador para drag & drop
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());
-
-// Cargar datos al iniciar
-loadFromServer();
 
 // ===== FUNCIONES PARA IMPORTADOR CSV =====
 
@@ -712,20 +899,15 @@ function processCsvFile(file) {
 
 function parseCsvContent(csvContent) {
     try {
-        // Parsear CSV simple - dividir por líneas y luego por comas
         const lines = csvContent.trim().split('\n');
         if (lines.length < 2) {
-            alert('El archivo CSV debe tener al menos una fila de encabezados y una fila de datos');
+            showMessage('El archivo CSV debe tener al menos una fila de encabezados y una fila de datos', 'error');
             return;
         }
 
-        // Detectar el separador (coma o punto y coma)
         const separator = lines[0].includes(';') ? ';' : ',';
-        
-        // Parsear encabezados
         const headers = lines[0].split(separator).map(h => h.trim().replace(/"/g, ''));
         
-        // Parsear datos
         const data = [];
         for (let i = 1; i < lines.length; i++) {
             if (lines[i].trim()) {
@@ -743,7 +925,7 @@ function parseCsvContent(csvContent) {
         
     } catch (error) {
         console.error('Error parsing CSV:', error);
-        alert('Error al procesar el archivo CSV. Asegúrate de que esté en el formato correcto.');
+        showMessage('Error al procesar el archivo CSV. Asegúrate de que esté en el formato correcto.', 'error');
     }
 }
 
@@ -773,10 +955,8 @@ function showCsvPreview(headers, data) {
     const table = document.getElementById('csvPreviewTable');
     const stats = document.getElementById('csvStats');
     
-    // Limpiar tabla
     table.innerHTML = '';
     
-    // Crear encabezados
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     headers.forEach(header => {
@@ -787,7 +967,6 @@ function showCsvPreview(headers, data) {
     thead.appendChild(headerRow);
     table.appendChild(thead);
     
-    // Crear filas de datos (máximo 5 para preview)
     const tbody = document.createElement('tbody');
     const previewData = data.slice(0, 5);
     previewData.forEach(row => {
@@ -801,10 +980,8 @@ function showCsvPreview(headers, data) {
     });
     table.appendChild(tbody);
     
-    // Mostrar estadísticas
     stats.textContent = `Total de productos a importar: ${data.length}`;
     
-    // Mostrar preview y botones
     csvPreview.style.display = 'block';
     importCsv.style.display = 'inline-block';
     cancelImport.style.display = 'inline-block';
@@ -812,9 +989,9 @@ function showCsvPreview(headers, data) {
 
 function downloadCsvTemplate() {
     const template = `nombre,descripcion,precio,stock,categoria,descuento,imagen_url
-"Producto Ejemplo 1","Descripción del producto 1",29.99,10,"Electrónicos",15,"https://ejemplo.com/imagen1.jpg"
-"Producto Ejemplo 2","Descripción del producto 2",45.50,5,"Ropa",0,"https://ejemplo.com/imagen2.jpg"
-"Producto Ejemplo 3","Descripción del producto 3",12.99,20,"Hogar",10,"https://ejemplo.com/imagen3.jpg"`;
+"Producto Ejemplo 1","Descripción del producto 1",29.99,10,"Electrónicos",15,"https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=200&h=200&fit=crop"
+"Producto Ejemplo 2","Descripción del producto 2",45.50,5,"Ropa",0,"https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=200&fit=crop"
+"Producto Ejemplo 3","Descripción del producto 3",12.99,20,"Hogar",10,"https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=200&h=200&fit=crop"`;
 
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -825,7 +1002,7 @@ function downloadCsvTemplate() {
 
 async function importCsvData() {
     if (!csvData || csvData.length === 0) {
-        alert('No hay datos para importar');
+        showMessage('No hay datos para importar', 'error');
         return;
     }
 
@@ -834,8 +1011,10 @@ async function importCsvData() {
         return;
     }
 
-    importCsv.textContent = 'Importando...';
-    importCsv.disabled = true;
+    const importBtn = importCsv;
+    const originalText = importBtn.textContent;
+    importBtn.textContent = 'Importando...';
+    importBtn.disabled = true;
 
     try {
         let importedCount = 0;
@@ -846,7 +1025,6 @@ async function importCsvData() {
             const row = csvData[i];
             
             try {
-                // Mapear campos del CSV a campos del producto
                 const name = row.nombre || row.name || '';
                 const shortDesc = row.descripcion || row.description || row.desc || '';
                 const price = parseFloat(row.precio || row.price || 0);
@@ -855,7 +1033,6 @@ async function importCsvData() {
                 const discount = parseInt(row.descuento || row.discount || 0);
                 const imageUrl = row.imagen_url || row.image_url || row.imagen || row.image || '';
 
-                // Validar campos obligatorios
                 if (!name.trim()) {
                     errors.push(`Fila ${i + 2}: Falta el nombre del producto`);
                     errorCount++;
@@ -868,7 +1045,6 @@ async function importCsvData() {
                     continue;
                 }
 
-                // Crear producto
                 const productData = {
                     id: Date.now() + i,
                     name: name.trim(),
@@ -880,7 +1056,6 @@ async function importCsvData() {
                     images: imageUrl.trim() ? [imageUrl.trim()] : []
                 };
 
-                // Agregar categoría si no existe
                 if (category.trim() && !categories.includes(category.trim())) {
                     categories.push(category.trim());
                 }
@@ -894,15 +1069,11 @@ async function importCsvData() {
             }
         }
 
-        // Guardar en servidor
         await saveToServer();
-        
-        // Actualizar UI
         render();
         fillCategories();
         cancelCsvImport();
 
-        // Mostrar resultado
         let message = `Importación completada:\n✅ ${importedCount} productos importados`;
         if (errorCount > 0) {
             message += `\n❌ ${errorCount} errores`;
@@ -914,13 +1085,14 @@ async function importCsvData() {
         }
         
         alert(message);
+        showMessage(`Importación completada: ${importedCount} productos agregados`, 'success');
 
     } catch (error) {
         console.error('Error importando CSV:', error);
-        alert('Error durante la importación. Por favor, inténtalo de nuevo.');
+        showMessage('Error durante la importación. Por favor, inténtalo de nuevo.', 'error');
     } finally {
-        importCsv.textContent = '📤 Importar Productos';
-        importCsv.disabled = false;
+        importBtn.textContent = originalText;
+        importBtn.disabled = false;
     }
 }
 
@@ -931,6 +1103,108 @@ function cancelCsvImport() {
     cancelImport.style.display = 'none';
     csvFileInput.value = '';
 }
+
+// Auto-reparación de imágenes rotas al cargar la página
+function fixBrokenImages() {
+    // Buscar y reemplazar todas las imágenes que contengan via.placeholder.com
+    const brokenImages = document.querySelectorAll('img[src*="via.placeholder"]');
+    brokenImages.forEach(img => {
+        const productName = img.alt || '';
+        const size = img.width || img.height || 40;
+        img.src = createProductPlaceholder(productName, size);
+    });
+    
+    // También verificar imágenes que no cargan
+    const allImages = document.querySelectorAll('img');
+    allImages.forEach(img => {
+        if (img.src.includes('via.placeholder')) {
+            const productName = img.alt || '';
+            const size = img.width || img.height || 40;
+            img.src = createProductPlaceholder(productName, size);
+        }
+    });
+}
+
+// Interceptar cualquier intento de cargar via.placeholder.com
+function interceptPlaceholderRequests() {
+    const originalCreateElement = document.createElement;
+    document.createElement = function(tagName) {
+        const element = originalCreateElement.call(document, tagName);
+        if (tagName.toLowerCase() === 'img') {
+            const originalSetSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
+            Object.defineProperty(element, 'src', {
+                set: function(value) {
+                    if (typeof value === 'string' && value.includes('via.placeholder')) {
+                        const size = value.match(/(\d+)/g);
+                        const width = size ? size[0] : 40;
+                        const height = size && size[1] ? size[1] : width;
+                        const altText = this.alt || '';
+                        originalSetSrc.call(this, createProductPlaceholder(altText, width));
+                    } else {
+                        originalSetSrc.call(this, value);
+                    }
+                },
+                get: function() {
+                    return Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').get.call(this);
+                }
+            });
+        }
+        return element;
+    };
+}
+
+// Inicializar la aplicación
+document.addEventListener('DOMContentLoaded', function() {
+    // Interceptar requests de placeholder ANTES de cualquier cosa
+    interceptPlaceholderRequests();
+    
+    // Arreglar imágenes rotas existentes
+    fixBrokenImages();
+    
+    // Cargar datos del servidor
+    loadFromServer();
+    
+    // Observar cambios en el DOM para interceptar nuevas imágenes
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node.nodeType === 1) { // Element node
+                    const images = node.tagName === 'IMG' ? [node] : 
+                                  node.querySelectorAll ? Array.from(node.querySelectorAll('img')) : [];
+                    
+                    images.forEach(img => {
+                        if (img.src && img.src.includes('via.placeholder')) {
+                            const productName = img.alt || '';
+                            const size = img.width || img.height || 40;
+                            img.src = createProductPlaceholder(productName, size);
+                        }
+                    });
+                }
+            });
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+});
+
+// Prevenir cualquier carga de via.placeholder.com a nivel global
+window.addEventListener('beforeunload', function() {
+    // Limpiar cualquier imagen problemática antes de salir
+    const brokenImages = document.querySelectorAll('img[src*="via.placeholder"]');
+    brokenImages.forEach(img => {
+        img.src = createPlaceholderSvg(40, 40, 'IMG');
+    });
+});
+
+// Hacer las funciones globales para que puedan ser llamadas desde el HTML
+window.handleImageError = handleImageError;
+window.removeImage = removeImage;
+window.edit = edit;
+window.del = del;
+window.logout = logout;
 </script>
 </body>
 </html>
