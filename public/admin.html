@@ -529,7 +529,7 @@
                 </div>
                 <div id="server-info" style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin-top: 20px;">
                     <h4>🔗 Estado del Servidor</h4>
-                    <p><strong>URL:</strong> <span id="api-url">http://localhost:4000</span></p>
+                    <p><strong>URL:</strong> <span id="api-url">(déjalo vacío)</span></p>
                     <p><strong>Base de datos:</strong> SQLite</p>
                     <p><strong>Última actualización:</strong> <span id="last-update">--</span></p>
                 </div>
@@ -658,7 +658,7 @@
     
     <script>
         // ===== CONFIGURACIÓN GLOBAL =====
-        const API_BASE = 'http://localhost:4000/api';
+        const API_BASE = '(déjalo vacío)/api';
         let storeData = {
             products: [],
             categories: [],
@@ -1126,7 +1126,7 @@
                     
                     // Añadir URLs al array de imágenes
                     result.urls.forEach(url => {
-                        const fullUrl = `http://localhost:4000${url}`;
+                        const fullUrl = `(déjalo vacío)${url}`;
                         uploadedImages.push(fullUrl);
                         addImageToPreview(fullUrl, url);
                     });
