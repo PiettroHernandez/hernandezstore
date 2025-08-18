@@ -146,6 +146,7 @@
         height: 220px;
         overflow: hidden;
         background: #222;
+        cursor: pointer;
     }
     
     .card-image img {
@@ -161,6 +162,142 @@
     
     .card.out-of-stock:hover .card-image img {
         transform: scale(1);
+    }
+    
+    .gallery-indicator {
+        position: absolute;
+        bottom: 0.8rem;
+        right: 0.8rem;
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 0.3rem 0.6rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        z-index: 3;
+    }
+    
+    /* Modal de Galería */
+    .gallery-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.95);
+        z-index: 2000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        backdrop-filter: blur(10px);
+    }
+    
+    .gallery-modal.show {
+        display: flex;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .gallery-container {
+        position: relative;
+        max-width: 90vw;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .gallery-image {
+        max-width: 100%;
+        max-height: 70vh;
+        object-fit: contain;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        animation: slideUp 0.3s ease;
+    }
+    
+    .gallery-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(0,0,0,0.7);
+        color: white;
+        border: none;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 10;
+    }
+    
+    .gallery-nav:hover {
+        background: rgba(0,0,0,0.9);
+        transform: translateY(-50%) scale(1.1);
+    }
+    
+    .gallery-nav.prev {
+        left: -70px;
+    }
+    
+    .gallery-nav.next {
+        right: -70px;
+    }
+    
+    .gallery-nav:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        transform: translateY(-50%) scale(1);
+    }
+    
+    .gallery-close {
+        position: absolute;
+        top: -60px;
+        right: 0;
+        background: rgba(220, 53, 69, 0.8);
+        color: white;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    
+    .gallery-close:hover {
+        background: rgba(220, 53, 69, 1);
+        transform: scale(1.1);
+    }
+    
+    .gallery-info {
+        margin-top: 1rem;
+        text-align: center;
+        background: rgba(0,0,0,0.7);
+        padding: 1rem;
+        border-radius: 10px;
+        max-width: 500px;
+    }
+    
+    .gallery-info h4 {
+        color: var(--accent);
+        margin: 0 0 0.5rem 0;
+        font-size: 1.2rem;
+    }
+    
+    .gallery-counter {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
     }
     
     .badge { 
@@ -312,6 +449,11 @@
         to { opacity: 1; }
     }
     
+    @keyframes slideUp {
+        from { transform: translateY(50px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    
     .modal { 
         background:var(--panel); 
         border-radius:16px; 
@@ -322,11 +464,6 @@
         box-shadow: 0 20px 60px rgba(0,0,0,0.5);
         border: 1px solid #333;
         animation: slideUp 0.3s ease;
-    }
-    
-    @keyframes slideUp {
-        from { transform: translateY(50px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
     }
     
     .modal h3 { 
@@ -480,8 +617,29 @@
     }
     footer strong { color:var(--accent); }
     
-    /* Responsive */
+    /* Responsive para galería */
     @media (max-width: 768px) {
+        .gallery-nav.prev {
+            left: -50px;
+        }
+        
+        .gallery-nav.next {
+            right: -50px;
+        }
+        
+        .gallery-nav {
+            width: 40px;
+            height: 40px;
+            font-size: 1.2rem;
+        }
+        
+        .gallery-close {
+            top: -50px;
+            width: 35px;
+            height: 35px;
+            font-size: 1rem;
+        }
+        
         .productos {
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 1rem;
@@ -533,6 +691,20 @@
     </div>
 </div>
 
+<!-- Modal de Galería -->
+<div class="gallery-modal" id="galleryModal">
+    <div class="gallery-container">
+        <button class="gallery-close" onclick="closeGallery()">×</button>
+        <button class="gallery-nav prev" id="prevBtn" onclick="navigateGallery(-1)">‹</button>
+        <img class="gallery-image" id="galleryImage" src="" alt="">
+        <button class="gallery-nav next" id="nextBtn" onclick="navigateGallery(1)">›</button>
+        <div class="gallery-info">
+            <h4 id="galleryTitle"></h4>
+            <div class="gallery-counter" id="galleryCounter"></div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de confirmación de compra -->
 <div class="modal-overlay" id="purchaseModal">
     <div class="modal">
@@ -574,6 +746,10 @@ let categories = [];
 let currentProduct = null;
 let currentQuantity = 1;
 
+// Variables para la galería
+let currentGalleryProduct = null;
+let currentImageIndex = 0;
+
 // Cargar productos desde la API real
 async function loadProducts(){
     try {
@@ -586,9 +762,7 @@ async function loadProducts(){
         `;
         
         const response = await fetch('/api/data');
-        if (!response.ok) {
-            throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
         const data = await response.json();
         
         allProducts = data.products || [];
@@ -598,7 +772,7 @@ async function loadProducts(){
             container.innerHTML = `
                 <div class="loading-state">
                     <h3>No hay productos disponibles</h3>
-                    <p>Ve al <a href="/admin.html" style="color: var(--accent);">panel de administración</a> para añadir productos</p>
+                    <p>Pronto añadiremos productos a la tienda 🛍️</p>
                 </div>
             `;
             return;
@@ -619,205 +793,129 @@ async function loadProducts(){
     }
 }
 
-function renderCategories(){
+// Renderizar categorías
+function renderCategories() {
     const container = document.getElementById('categoryButtons');
-    container.innerHTML = '';
-    
-    const allBtn = document.createElement('button');
-    allBtn.textContent = 'Todos';
-    allBtn.classList.add('active');
-    allBtn.onclick = () => { 
-        setActiveCategory(allBtn); 
-        filteredProducts = [...allProducts]; 
-        applySearchAndRender(); 
-    };
-    container.appendChild(allBtn);
-    
-    categories.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.textContent = cat.label || cat.name;
-        btn.onclick = () => {
-            setActiveCategory(btn);
-            filteredProducts = allProducts.filter(p => 
-                p.category && (
-                    p.category.toLowerCase() === (cat.name||'').toLowerCase() ||
-                    p.category.toLowerCase() === (cat.label||'').toLowerCase()
-                )
-            );
-            applySearchAndRender();
-        };
-        container.appendChild(btn);
-    });
+    container.innerHTML = `
+        <button onclick="filterByCategory('all')" class="active">Todos</button>
+        ${categories.map(cat => `<button onclick="filterByCategory('${cat}')">${cat}</button>`).join('')}
+    `;
 }
 
-function setActiveCategory(activeBtn){
-    document.querySelectorAll('.categories button').forEach(b => b.classList.remove('active'));
-    activeBtn.classList.add('active');
-}
-
-function renderProducts(list){
+// Renderizar productos
+function renderProducts(products) {
     const container = document.getElementById('productos');
-    if(!list || list.length === 0){
+    if (products.length === 0) {
         container.innerHTML = `
             <div class="loading-state">
-                <h3>No hay productos disponibles</h3>
-                <p>Intenta cambiar los filtros o buscar algo diferente</p>
+                <h3>No se encontraron productos</h3>
+                <p>Intenta con otra búsqueda o categoría</p>
             </div>
         `;
         return;
     }
     
-    container.innerHTML = '';
-    list.forEach(product => {
-        const hasDiscount = product.discount && product.discount > 0;
-        const finalPrice = hasDiscount ? (product.price * (1 - product.discount / 100)) : product.price;
-        const stockStatus = getStockStatus(product.stock);
-        const firstImage = product.images && product.images.length > 0 ? product.images[0] : '/api/placeholder/280/220';
+    container.innerHTML = products.map(product => {
+        const stockClass = product.stock <= 0 ? 'stock-out' : product.stock <= 5 ? 'stock-low' : 'stock-high';
+        const stockText = product.stock <= 0 ? 'Agotado' : product.stock <= 5 ? `${product.stock} disponibles` : 'Disponible';
+        const cardClass = product.stock <= 0 ? 'card out-of-stock' : 'card';
         
-        container.innerHTML += `
-            <div class="card ${product.stock <= 0 ? 'out-of-stock' : ''}">
-                <div class="card-image">
-                    <img src="${firstImage}" alt="${product.name}" onerror="this.src='/api/placeholder/280/220'">
-                    ${hasDiscount ? `<div class="badge">-${product.discount}%</div>` : ''}
-                    <div class="stock-badge ${stockStatus.class}">${stockStatus.text}</div>
+        // Determinar si tiene múltiples imágenes
+        const hasMultipleImages = product.images && product.images.length > 1;
+        const galleryIndicator = hasMultipleImages ? 
+            `<div class="gallery-indicator">📷 ${product.images.length}</div>` : '';
+        
+        return `
+            <div class="${cardClass}">
+                <div class="card-image" onclick="openGallery(${allProducts.indexOf(product)})">
+                    <img src="${product.image}" alt="${product.name}" loading="lazy">
+                    ${product.discount > 0 ? `<div class="badge">-${product.discount}%</div>` : ''}
+                    <div class="stock-badge ${stockClass}">${stockText}</div>
+                    ${galleryIndicator}
                 </div>
                 <div class="card-content">
                     <h3>${product.name}</h3>
-                    <p class="card-description">${product.shortDesc || 'Sin descripción disponible'}</p>
+                    <p class="card-description">${product.description}</p>
                     <div class="price-section">
                         <div class="price">
-                            <span class="now">S/. ${finalPrice.toFixed(2)}</span>
-                            ${hasDiscount ? `<span class="old">S/. ${product.price.toFixed(2)}</span>` : ''}
+                            <span class="now">S/. ${product.price.toFixed(2)}</span>
+                            ${product.originalPrice ? `<span class="old">S/. ${product.originalPrice.toFixed(2)}</span>` : ''}
                         </div>
-                        <div class="stock-info ${stockStatus.class}">
-                            ${product.stock > 0 ? `Disponible: ${product.stock} unidades` : 'Sin stock'}
+                        <div class="stock-info ${product.stock <= 5 ? 'low' : ''} ${product.stock <= 0 ? 'out' : ''}">
+                            ${stockText}
                         </div>
                     </div>
                 </div>
                 <div class="card-footer">
-                    <button class="btn-comprar" 
-                            ${product.stock <= 0 ? 'disabled' : ''} 
-                            onclick="openPurchaseModal(${product.id})">
-                        ${product.stock <= 0 ? 'Sin Stock' : '🛒 Comprar Ahora'}
+                    <button class="btn-comprar" ${product.stock <= 0 ? 'disabled' : ''} 
+                            onclick="${product.stock > 0 ? `openPurchaseModal(${allProducts.indexOf(product)})` : ''}">
+                        ${product.stock <= 0 ? '❌ Agotado' : '🛒 Comprar'}
                     </button>
                 </div>
             </div>
         `;
-    });
+    }).join('');
 }
 
-function getStockStatus(stock) {
-    if (stock <= 0) return { class: 'stock-out', text: 'Sin Stock' };
-    if (stock <= 5) return { class: 'stock-low', text: 'Pocas Unidades' };
-    return { class: 'stock-high', text: 'Disponible' };
+// Abrir galería de imágenes
+function openGallery(productIndex) {
+    const product = allProducts[productIndex];
+    if (!product) return;
+    
+    currentGalleryProduct = product;
+    currentImageIndex = 0;
+    
+    const modal = document.getElementById('galleryModal');
+    const image = document.getElementById('galleryImage');
+    const title = document.getElementById('galleryTitle');
+    const counter = document.getElementById('galleryCounter');
+    
+    // Usar el array de imágenes si existe, sino usar la imagen principal
+    const images = product.images && product.images.length > 0 ? product.images : [product.image];
+    
+    image.src = images[0];
+    title.textContent = product.name;
+    counter.textContent = `${currentImageIndex + 1} de ${images.length}`;
+    
+    updateGalleryNavigation();
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
 }
 
-function openPurchaseModal(productId) {
-    currentProduct = allProducts.find(p => p.id === productId);
-    if (!currentProduct) return;
+// Navegar en la galería
+function navigateGallery(direction) {
+    if (!currentGalleryProduct) return;
     
-    currentQuantity = 1;
-    updateModalContent();
-    document.getElementById('purchaseModal').classList.add('show');
-    document.body.style.overflow = 'hidden'; // Evitar scroll del body
+    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
+        ? currentGalleryProduct.images 
+        : [currentGalleryProduct.image];
+    
+    currentImageIndex += direction;
+    
+    if (currentImageIndex < 0) currentImageIndex = images.length - 1;
+    if (currentImageIndex >= images.length) currentImageIndex = 0;
+    
+    const image = document.getElementById('galleryImage');
+    const counter = document.getElementById('galleryCounter');
+    
+    image.src = images[currentImageIndex];
+    counter.textContent = `${currentImageIndex + 1} de ${images.length}`;
+    
+    updateGalleryNavigation();
 }
 
-function closePurchaseModal() {
-    document.getElementById('purchaseModal').classList.remove('show');
-    document.body.style.overflow = 'auto';
-    currentProduct = null;
-    currentQuantity = 1;
+// Actualizar botones de navegación
+function updateGalleryNavigation() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    
+    if (!currentGalleryProduct) return;
+
+    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
+        ? currentGalleryProduct.images 
+        : [currentGalleryProduct.image];
+
+    // Si hay más de 1 imagen, los botones quedan activos
+    prevBtn.disabled = images.length <= 1;
+    nextBtn.disabled = images.length <= 1;
 }
-
-function updateModalContent() {
-    if (!currentProduct) return;
-    
-    const hasDiscount = currentProduct.discount && currentProduct.discount > 0;
-    const finalPrice = hasDiscount ? (currentProduct.price * (1 - currentProduct.discount / 100)) : currentProduct.price;
-    
-    document.getElementById('modalProductName').textContent = currentProduct.name;
-    document.getElementById('modalProductDesc').textContent = currentProduct.shortDesc || 'Sin descripción disponible';
-    document.getElementById('modalProductPrice').textContent = `S/. ${finalPrice.toFixed(2)}${hasDiscount ? ` (${currentProduct.discount}% desc.)` : ''}`;
-    document.getElementById('quantityInput').value = currentQuantity;
-    document.getElementById('totalAmount').textContent = `S/. ${(finalPrice * currentQuantity).toFixed(2)}`;
-    
-    // Actualizar botones de cantidad
-    document.getElementById('decreaseBtn').disabled = currentQuantity <= 1;
-    document.getElementById('increaseBtn').disabled = currentQuantity >= currentProduct.stock;
-}
-
-function changeQuantity(change) {
-    if (!currentProduct) return;
-    
-    const newQuantity = currentQuantity + change;
-    if (newQuantity >= 1 && newQuantity <= currentProduct.stock) {
-        currentQuantity = newQuantity;
-        updateModalContent();
-    }
-}
-
-function confirmPurchase() {
-    if (!currentProduct) return;
-    
-    const hasDiscount = currentProduct.discount && currentProduct.discount > 0;
-    const finalPrice = hasDiscount ? (currentProduct.price * (1 - currentProduct.discount / 100)) : currentProduct.price;
-    const total = finalPrice * currentQuantity;
-    
-    // Crear mensaje para WhatsApp
-    let message = `🛒 *¡Hola! He confirmado mi compra*\n\n`;
-    message += `📦 *Producto:* ${currentProduct.name}\n`;
-    message += `📝 *Descripción:* ${currentProduct.shortDesc || 'Sin descripción'}\n`;
-    message += `🔢 *Cantidad:* ${currentQuantity} ${currentQuantity > 1 ? 'unidades' : 'unidad'}\n`;
-    message += `💰 *Precio unitario:* S/. ${finalPrice.toFixed(2)}`;
-    if (hasDiscount) {
-        message += ` *(${currentProduct.discount}% descuento)*`;
-    }
-    message += `\n💳 *Total a pagar:* S/. ${total.toFixed(2)}\n\n`;
-    message += `¡Gracias! Espero su confirmación para proceder con el pedido. 😊`;
-    
-    const whatsappNumber = "51929528308"; // Formato internacional
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
-    
-    // Cerrar modal y abrir WhatsApp
-    closePurchaseModal();
-    window.open(whatsappUrl, '_blank');
-}
-
-function applySearchAndRender(){
-    const term = (document.getElementById('searchInput').value || '').toLowerCase();
-    const list = filteredProducts.filter(p =>
-        (p.name||'').toLowerCase().includes(term) ||
-        (p.shortDesc||'').toLowerCase().includes(term) ||
-        (p.category||'').toLowerCase().includes(term)
-    );
-    renderProducts(list);
-}
-
-// Event listeners
-document.getElementById('searchInput').addEventListener('input', applySearchAndRender);
-
-// Cerrar modal al hacer clic fuera
-document.getElementById('purchaseModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closePurchaseModal();
-    }
-});
-
-// Cerrar modal con Escape
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closePurchaseModal();
-    }
-});
-
-// Menú responsive
-document.getElementById('menuToggle').addEventListener('click', function() {
-    document.getElementById('topBar').classList.toggle('show');
-});
-
-// Inicializar
-loadProducts();
-</script>
-</body>
-</html>
