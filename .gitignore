@@ -1,0 +1,47 @@
+# ==========================
+# Node.js
+# ==========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================
+# Environment variables
+# ==========================
+.env
+.env.*
+!.env.example   # Mantener un archivo de ejemplo sin credenciales
+
+# ==========================
+# Logs
+# ==========================
+logs
+*.log
+logs/*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ==========================
+# OS / Editor
+# ==========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ==========================
+# Build / Coverage
+# ==========================
+dist/
+build/
+coverage/
+.nyc_output/
+
+# ==========================
+# Uploads temporales
+# ==========================
+uploads/
