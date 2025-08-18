@@ -23,8 +23,8 @@ let connectionString = process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_U
 
 const pool = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === "production" 
-    ? { rejectUnauthorized: false }  // Railway producción
+  ssl: process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: false } // Railway producción
     : false                          // Local sin SSL
 });
 
@@ -223,7 +223,7 @@ app.get('/api/test', (req, res) => {
 // =======================
 // 📌 INICIO SERVIDOR
 // =======================
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
   console.log(`📱 Panel admin en: /admin`);
   console.log(`🏪 Tienda en: /`);
