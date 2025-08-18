@@ -34,7 +34,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
 const initDatabase = async () => {
   return new Promise((resolve, reject) => {
     db.serialize(() => {
-      // Tabla productos
       db.run(`
         CREATE TABLE IF NOT EXISTS products (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,11 +46,8 @@ const initDatabase = async () => {
           images TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-      `, (err) => {
-        if (err) console.error('❌ Error creando tabla products:', err);
-      });
+      `);
 
-      // Tabla categorías
       db.run(`
         CREATE TABLE IF NOT EXISTS categories (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,11 +55,8 @@ const initDatabase = async () => {
           label TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-      `, (err) => {
-        if (err) console.error('❌ Error creando tabla categories:', err);
-      });
+      `);
 
-      // Insertar categorías por defecto
       db.get('SELECT COUNT(*) as count FROM categories', (err, row) => {
         if (!err && row.count === 0) {
           const defaultCategories = [
@@ -73,7 +66,6 @@ const initDatabase = async () => {
             ['home', 'Hogar'],
             ['sports', 'Deportes']
           ];
-
           const stmt = db.prepare('INSERT INTO categories (name, label) VALUES (?, ?)');
           defaultCategories.forEach(cat => stmt.run(cat));
           stmt.finalize();
@@ -87,7 +79,6 @@ const initDatabase = async () => {
   });
 };
 
-// Inicializar base de datos
 initDatabase();
 
 // =======================
@@ -95,7 +86,7 @@ initDatabase();
 // =======================
 function runQuery(sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
+    db.run(sql, params, function (err) {
       if (err) reject(err);
       else resolve({ id: this.lastID, changes: this.changes });
     });
@@ -125,8 +116,46 @@ function allQuery(sql, params = []) {
 // =======================
 app.use('/', express.static(path.join(__dirname, 'public')));
 
+// Servir imágenes públicas
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// =======================
+// 📌 CONFIGURACIÓN DE MULTER (UPLOADS)
+// =======================
+const uploadsDir = path.join(__dirname, 'public/uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, uniqueSuffix + ext);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Solo se permiten imágenes'));
+  }
+});
+
+// Endpoint para subir imágenes
+app.post('/api/upload', upload.array('images'), (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ success: false, message: "No se subieron imágenes" });
+  }
+  const urls = req.files.map(file => `/uploads/${file.filename}`);
+  res.json({ success: true, urls });
 });
 
 // =======================
@@ -136,8 +165,7 @@ app.get('/api/data', async (req, res) => {
   try {
     const products = await allQuery('SELECT * FROM products ORDER BY id DESC');
     const categories = await allQuery('SELECT * FROM categories ORDER BY id ASC');
-    
-    // Parsear imágenes JSON
+
     const processedProducts = products.map(product => ({
       ...product,
       images: product.images ? JSON.parse(product.images) : []
@@ -145,7 +173,7 @@ app.get('/api/data', async (req, res) => {
 
     res.json({
       products: processedProducts,
-      categories: categories,
+      categories,
       discounts: [],
       config: {
         whatsapp: {
@@ -160,38 +188,29 @@ app.get('/api/data', async (req, res) => {
 });
 
 // =======================
-// 📌 RUTAS CRUD PRODUCTOS
+// 📌 CRUD PRODUCTOS
 // =======================
-
-// Crear producto
 app.post('/api/products', async (req, res) => {
   try {
     const { name, shortDesc, price, category, discount, stock, images } = req.body;
-    
     const result = await runQuery(`
       INSERT INTO products (name, shortDesc, price, category, discount, stock, images)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [name, shortDesc, price, category, discount || 0, stock || 0, JSON.stringify(images || [])]);
-    
+
     const newProduct = await getQuery('SELECT * FROM products WHERE id = ?', [result.id]);
     newProduct.images = JSON.parse(newProduct.images || '[]');
-    
     res.json({ success: true, product: newProduct });
   } catch (err) {
     res.status(500).json({ error: "Error creando producto", details: err.message });
   }
 });
 
-// Obtener un producto específico
 app.get('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const product = await getQuery('SELECT * FROM products WHERE id = ?', [id]);
-    
-    if (!product) {
-      return res.status(404).json({ error: "Producto no encontrado" });
-    }
-    
+    if (!product) return res.status(404).json({ error: "Producto no encontrado" });
     product.images = JSON.parse(product.images || '[]');
     res.json({ success: true, product });
   } catch (err) {
@@ -199,24 +218,18 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// Actualizar producto
 app.put('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, shortDesc, price, category, discount, stock, images } = req.body;
-    
     await runQuery(`
       UPDATE products 
-      SET name = ?, shortDesc = ?, price = ?, category = ?, 
-          discount = ?, stock = ?, images = ?
+      SET name = ?, shortDesc = ?, price = ?, category = ?, discount = ?, stock = ?, images = ?
       WHERE id = ?
     `, [name, shortDesc, price, category, discount, stock, JSON.stringify(images), id]);
-    
+
     const updatedProduct = await getQuery('SELECT * FROM products WHERE id = ?', [id]);
-    if (!updatedProduct) {
-      return res.status(404).json({ error: "Producto no encontrado" });
-    }
-    
+    if (!updatedProduct) return res.status(404).json({ error: "Producto no encontrado" });
     updatedProduct.images = JSON.parse(updatedProduct.images || '[]');
     res.json({ success: true, product: updatedProduct });
   } catch (err) {
@@ -224,16 +237,11 @@ app.put('/api/products/:id', async (req, res) => {
   }
 });
 
-// Eliminar producto
 app.delete('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await runQuery('DELETE FROM products WHERE id = ?', [id]);
-    
-    if (result.changes === 0) {
-      return res.status(404).json({ error: "Producto no encontrado" });
-    }
-    
+    if (result.changes === 0) return res.status(404).json({ error: "Producto no encontrado" });
     res.json({ success: true, message: "Producto eliminado" });
   } catch (err) {
     res.status(500).json({ error: "Error eliminando producto", details: err.message });
@@ -241,68 +249,12 @@ app.delete('/api/products/:id', async (req, res) => {
 });
 
 // =======================
-// 📌 RUTAS DE CARRITO Y COMPRA
+// 📌 CRUD CATEGORÍAS
 // =======================
-
-// Procesar compra y redirigir a WhatsApp
-app.post('/api/purchase', async (req, res) => {
-  try {
-    const { cart, customerData } = req.body;
-    
-    if (!cart || cart.length === 0) {
-      return res.status(400).json({ error: "Carrito vacío" });
-    }
-    
-    // Calcular total
-    let total = 0;
-    let productDetails = [];
-    
-    for (const item of cart) {
-      const product = await getQuery('SELECT * FROM products WHERE id = ?', [item.id]);
-      if (product) {
-        const itemTotal = product.price * item.quantity;
-        total += itemTotal;
-        productDetails.push(`${product.name} x${item.quantity} - S/. ${itemTotal.toFixed(2)}`);
-      }
-    }
-    
-    // Crear mensaje para WhatsApp
-    const whatsappNumber = "929528308";
-    let message = `🛒 *Nueva Compra*\n\n`;
-    message += `👤 *Cliente:* ${customerData.name || 'No especificado'}\n`;
-    message += `📱 *Teléfono:* ${customerData.phone || 'No especificado'}\n`;
-    message += `📧 *Email:* ${customerData.email || 'No especificado'}\n\n`;
-    message += `🛍️ *Productos:*\n`;
-    message += productDetails.join('\n') + '\n\n';
-    message += `💰 *Total: S/. ${total.toFixed(2)}*`;
-    
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
-    
-    res.json({ 
-      success: true, 
-      whatsappUrl,
-      total,
-      message: "Compra procesada. Serás redirigido a WhatsApp."
-    });
-    
-  } catch (err) {
-    res.status(500).json({ error: "Error procesando compra", details: err.message });
-  }
-});
-
-// =======================
-// 📌 RUTAS CATEGORÍAS CRUD
-// =======================
-
-// Crear categoría
 app.post('/api/categories', async (req, res) => {
   try {
     const { name, label } = req.body;
-    
-    // Intentar actualizar primero
     const existing = await getQuery('SELECT id FROM categories WHERE name = ?', [name]);
-    
     if (existing) {
       await runQuery('UPDATE categories SET label = ? WHERE name = ?', [label, name]);
       const updated = await getQuery('SELECT * FROM categories WHERE name = ?', [name]);
@@ -317,16 +269,11 @@ app.post('/api/categories', async (req, res) => {
   }
 });
 
-// Eliminar categoría
 app.delete('/api/categories/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await runQuery('DELETE FROM categories WHERE id = ?', [id]);
-    
-    if (result.changes === 0) {
-      return res.status(404).json({ error: "Categoría no encontrada" });
-    }
-    
+    if (result.changes === 0) return res.status(404).json({ error: "Categoría no encontrada" });
     res.json({ success: true, message: "Categoría eliminada" });
   } catch (err) {
     res.status(500).json({ error: "Error eliminando categoría", details: err.message });
@@ -334,28 +281,39 @@ app.delete('/api/categories/:id', async (req, res) => {
 });
 
 // =======================
-// 📌 UPLOAD DE IMÁGENES
+// 📌 COMPRA
 // =======================
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.post('/api/purchase', async (req, res) => {
+  try {
+    const { cart, customerData } = req.body;
+    if (!cart || cart.length === 0) return res.status(400).json({ error: "Carrito vacío" });
 
-const upload = multer({
-  dest: 'uploads/',
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Solo se permiten imágenes'));
+    let total = 0;
+    let productDetails = [];
+    for (const item of cart) {
+      const product = await getQuery('SELECT * FROM products WHERE id = ?', [item.id]);
+      if (product) {
+        const itemTotal = product.price * item.quantity;
+        total += itemTotal;
+        productDetails.push(`${product.name} x${item.quantity} - S/. ${itemTotal.toFixed(2)}`);
+      }
+    }
+
+    const whatsappNumber = "929528308";
+    let message = `🛒 *Nueva Compra*\n\n`;
+    message += `👤 *Cliente:* ${customerData.name || 'No especificado'}\n`;
+    message += `📱 *Teléfono:* ${customerData.phone || 'No especificado'}\n`;
+    message += `📧 *Email:* ${customerData.email || 'No especificado'}\n\n`;
+    message += `🛍️ *Productos:*\n${productDetails.join('\n')}\n\n`;
+    message += `💰 *Total: S/. ${total.toFixed(2)}*`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+    res.json({ success: true, whatsappUrl, total, message: "Compra procesada. Serás redirigido a WhatsApp." });
+  } catch (err) {
+    res.status(500).json({ error: "Error procesando compra", details: err.message });
   }
 });
-
-app.post('/api/upload', upload.array('images'), (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ success: false, message: "No se subieron imágenes" });
-  }
-  const urls = req.files.map(file => `/uploads/${file.filename}`);
-  res.json({ success: true, urls });
-});
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // =======================
 // 📌 TEST
