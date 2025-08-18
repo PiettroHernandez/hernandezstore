@@ -1,1084 +1,1301 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Hernandezstore - Panel de Administración</title>
-<style>
-body { font-family: Arial, sans-serif; background: #121212; color: white; margin: 0; }
-header { background: #1e1e1e; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
-header h1 { margin: 0; font-size: 1.2rem; }
-header button { background: #ff4b4b; border: none; padding: 0.5rem 1rem; color: white; cursor: pointer; border-radius: 4px; }
-header button:hover { background: #cc0000; }
-.container { max-width: 900px; margin: auto; padding: 1rem; }
-input, select, textarea { width: 100%; padding: 0.5rem; margin: 0.25rem 0; background: #1e1e1e; border: none; color: white; border-radius: 4px; box-sizing: border-box; }
-button { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; margin: 0.25rem; }
-.add-btn { background: #6200ee; color: white; }
-.save-btn { background: #4CAF50; color: white; }
-.cancel-btn { background: #777; color: white; }
-.edit-btn { background: orange; color: black; }
-.delete-btn { background: red; color: white; }
-.product { background: #1e1e1e; padding: 0.5rem; margin: 0.5rem 0; display: flex; justify-content: space-between; align-items: center; border-radius: 6px; }
-.product img { max-height: 40px; margin-right: 10px; border-radius: 4px; }
-.img-preview { max-height: 120px; margin-top: 10px; display: block; border-radius: 8px; border: 2px solid #333; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Admin - HernándezStore</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-/* Estilos para imagen de fallback */
-.no-image-placeholder {
-    width: 40px;
-    height: 40px;
-    background: #333;
-    border-radius: 4px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px;
-    color: #666;
-    font-size: 12px;
-    text-align: center;
-}
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
 
-/* Zona de arrastrar y soltar */
-.image-upload-area {
-    border: 2px dashed #555;
-    border-radius: 8px;
-    padding: 2rem;
-    text-align: center;
-    margin: 1rem 0;
-    background: #1a1a1a;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-.image-upload-area.drag-over {
-    border-color: #6200ee;
-    background: #2a1a4a;
-}
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            text-align: center;
+            position: relative;
+        }
 
-.image-upload-area:hover {
-    border-color: #777;
-    background: #252525;
-}
+        .connection-status {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: white;
+        }
 
-.upload-icon {
-    font-size: 3rem;
-    color: #555;
-    margin-bottom: 1rem;
-}
+        .connection-status.connected {
+            background: #28a745;
+        }
 
-.upload-text {
-    color: #aaa;
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-}
+        .connection-status.disconnected {
+            background: #dc3545;
+        }
 
-.upload-subtext {
-    color: #777;
-    font-size: 0.9rem;
-}
+        .connection-status.loading {
+            background: #ffc107;
+            color: #333;
+        }
 
-.image-options {
-    display: flex;
-    gap: 1rem;
-    margin: 1rem 0;
-    align-items: center;
-}
+        .store-link {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
 
-.image-options label {
-    color: #ccc;
-    font-weight: bold;
-}
+        .store-link:hover {
+            background: #0056b3;
+        }
 
-.url-input {
-    flex: 1;
-}
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-.add-url-btn {
-    background: #6200ee;
-    color: white;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    white-space: nowrap;
-}
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-radius: 12px;
+            padding: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
 
-.add-url-btn:hover {
-    background: #5000cc;
-}
+        .nav-tab {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+        }
 
-.image-preview-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 10px;
-}
+        .nav-tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
 
-.image-item {
-    position: relative;
-    display: inline-block;
-}
+        .nav-tab.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
 
-.image-item img {
-    max-height: 80px;
-    max-width: 80px;
-    object-fit: cover;
-    border-radius: 6px;
-    border: 2px solid #333;
-}
+        .content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
 
-.remove-image {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background: #ff4444;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    font-size: 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+        .tab-content {
+            display: none;
+        }
 
-.remove-image:hover {
-    background: #cc0000;
-}
+        .tab-content.active {
+            display: block;
+        }
 
-.hidden-file-input {
-    display: none;
-}
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
 
-/* Responsive */
-@media (max-width: 600px) {
-    .image-options {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .add-url-btn {
-        margin-top: 0.5rem;
-    }
-}
+        .stat-card {
+            padding: 25px;
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+            background: linear-gradient(45deg, #28a745, #20c997);
+        }
 
-/* Estilos para importador CSV */
-.csv-import-section {
-    background: #1a1a1a;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin: 1rem 0;
-    border: 1px solid #333;
-}
+        .stat-card.products { background: linear-gradient(45deg, #28a745, #20c997); }
+        .stat-card.categories { background: linear-gradient(45deg, #17a2b8, #20c997); }
+        .stat-card.low-stock { background: linear-gradient(45deg, #ffc107, #fd7e14); }
+        .stat-card.total-value { background: linear-gradient(45deg, #6f42c1, #e83e8c); }
 
-.csv-import-section h3 {
-    margin-top: 0;
-    color: #fff;
-    font-size: 1.1rem;
-}
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
 
-.csv-upload-area {
-    border: 2px dashed #555;
-    border-radius: 8px;
-    padding: 1.5rem;
-    text-align: center;
-    margin: 1rem 0;
-    background: #252525;
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
+        .stat-card .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
 
-.csv-upload-area.drag-over {
-    border-color: #4CAF50;
-    background: #1a3a1a;
-}
+        .form-group {
+            margin-bottom: 25px;
+        }
 
-.csv-upload-area:hover {
-    border-color: #777;
-    background: #2a2a2a;
-}
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
 
-.csv-options {
-    display: flex;
-    gap: 0.5rem;
-    margin: 1rem 0;
-    flex-wrap: wrap;
-}
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
 
-.template-btn {
-    background: #2196F3;
-    color: white;
-}
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
 
-.template-btn:hover {
-    background: #1976D2;
-}
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
 
-.import-btn {
-    background: #4CAF50;
-    color: white;
-}
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
 
-.import-btn:hover {
-    background: #45a049;
-}
+        /* Productos */
+        .products-actions {
+            margin-bottom: 25px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
 
-.csv-preview {
-    background: #2a2a2a;
-    border-radius: 6px;
-    padding: 1rem;
-    margin: 1rem 0;
-}
+        .product-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s;
+        }
 
-.csv-preview h4 {
-    margin: 0 0 1rem 0;
-    color: #fff;
-}
+        .product-card:hover {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            transform: translateY(-3px);
+        }
 
-.csv-table-container {
-    overflow-x: auto;
-    margin: 1rem 0;
-}
+        .product-image {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            background: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 24px;
+        }
 
-.csv-table-container table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #1e1e1e;
-    border-radius: 4px;
-    overflow: hidden;
-}
+        .product-info {
+            flex: 1;
+        }
 
-.csv-table-container th,
-.csv-table-container td {
-    padding: 0.5rem;
-    text-align: left;
-    border-bottom: 1px solid #444;
-    color: white;
-    font-size: 0.9rem;
-}
+        .product-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
 
-.csv-table-container th {
-    background: #333;
-    font-weight: bold;
-}
+        .product-desc {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
 
-.csv-table-container tr:hover {
-    background: #333;
-}
+        .product-price {
+            font-size: 20px;
+            font-weight: 700;
+            color: #28a745;
+            margin-bottom: 5px;
+        }
 
-#csvStats {
-    color: #aaa;
-    font-size: 0.9rem;
-    margin: 0.5rem 0;
-}
+        .product-meta {
+            font-size: 12px;
+            color: #999;
+        }
 
-/* Mensaje de error de imagen */
-.image-error {
-    color: #ff6b6b;
-    font-size: 0.8rem;
-    margin-top: 0.25rem;
-}
-</style>
+        .product-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Drag & Drop */
+        .drop-zone {
+            border: 3px dashed #ccc;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            position: relative;
+        }
+
+        .drop-zone:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .drop-zone.dragover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            transform: scale(1.02);
+        }
+
+        .drop-zone-content {
+            pointer-events: none;
+        }
+
+        .drop-zone-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+        .drop-zone-text {
+            font-size: 18px;
+            font-weight: 500;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .drop-zone-subtext {
+            font-size: 14px;
+            color: #999;
+        }
+
+        .image-preview {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .image-wrapper {
+            position: relative;
+            display: inline-block;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .image-wrapper:hover {
+            transform: translateY(-5px);
+        }
+
+        .image-wrapper img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .image-remove {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        .image-remove:hover {
+            background: #dc3545;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .upload-progress {
+            margin-top: 15px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading-message {
+            text-align: center;
+            padding: 60px;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .no-products {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .no-products-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            color: #ccc;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .category-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
 </head>
 <body>
-<header>
-  <h1>Panel de Administración</h1>
-  <button onclick="logout()">Cerrar sesión</button>
-</header>
-<div class="container">
-  <h2>Lista de Productos</h2>
-  
-  <!-- Sección de importación CSV -->
-  <div class="csv-import-section">
-    <h3>Importar Productos desde CSV</h3>
-    <div class="csv-upload-area" id="csvUploadArea">
-      <div class="upload-icon">📊</div>
-      <div class="upload-text">Arrastra un archivo CSV aquí o haz clic para seleccionar</div>
-      <div class="upload-subtext">Formato: nombre,descripcion,precio,stock,categoria,descuento,imagen_url</div>
+    <div class="container">
+        <div class="header">
+            <div class="connection-status loading" id="connectionStatus">🔄 Conectando...</div>
+            <a href="/" class="store-link" target="_blank">🛒 Ver Tienda</a>
+            <h1>🏪 Panel de Administración</h1>
+            <p>Gestiona tu tienda online HernándezStore</p>
+        </div>
+        
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showTab('products')">📦 Productos</button>
+            <button class="nav-tab" onclick="showTab('categories')">📂 Categorías</button>
+            <button class="nav-tab" onclick="showTab('add-product')">➕ Añadir Producto</button>
+        </div>
+        
+        <div class="content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <h2>📊 Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card products">
+                        <h3>📦 Total Productos</h3>
+                        <div class="stat-number" id="total-products">--</div>
+                        <div>En catálogo</div>
+                    </div>
+                    <div class="stat-card categories">
+                        <h3>📂 Categorías</h3>
+                        <div class="stat-number" id="total-categories">--</div>
+                        <div>Disponibles</div>
+                    </div>
+                    <div class="stat-card low-stock">
+                        <h3>⚠️ Stock Bajo</h3>
+                        <div class="stat-number" id="low-stock">--</div>
+                        <div>Productos</div>
+                    </div>
+                    <div class="stat-card total-value">
+                        <h3>💰 Valor Total</h3>
+                        <div class="stat-number" id="total-value">--</div>
+                        <div>Inventario</div>
+                    </div>
+                </div>
+                <div id="server-info" style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                    <h4>🔗 Estado del Servidor</h4>
+                    <p><strong>URL:</strong> <span id="api-url">http://localhost:4000</span></p>
+                    <p><strong>Base de datos:</strong> SQLite</p>
+                    <p><strong>Última actualización:</strong> <span id="last-update">--</span></p>
+                </div>
+            </div>
+
+            <!-- Products Tab -->
+            <div id="products" class="tab-content">
+                <h2>📦 Gestión de Productos</h2>
+                <div class="products-actions">
+                    <button class="btn btn-success" onclick="loadProducts()">🔄 Actualizar Lista</button>
+                    <button class="btn btn-secondary" onclick="exportProducts()">📤 Exportar JSON</button>
+                    <span id="products-count" style="margin-left: auto; color: #666;"></span>
+                </div>
+                <div id="products-list">
+                    <div class="loading-message">🔄 Cargando productos...</div>
+                </div>
+            </div>
+
+            <!-- Categories Tab -->
+            <div id="categories" class="tab-content">
+                <h2>📂 Gestión de Categorías</h2>
+                <div class="products-actions">
+                    <button class="btn btn-success" onclick="loadCategories()">🔄 Actualizar</button>
+                    <button class="btn btn-success" onclick="showAddCategoryForm()">➕ Nueva Categoría</button>
+                </div>
+                
+                <div id="add-category-form" class="hidden" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4>➕ Añadir Nueva Categoría</h4>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>ID de la Categoría</label>
+                            <input type="text" id="category-name" placeholder="ej: electronica">
+                        </div>
+                        <div class="form-group">
+                            <label>Nombre a Mostrar</label>
+                            <input type="text" id="category-label" placeholder="ej: Electrónica">
+                        </div>
+                    </div>
+                    <button class="btn btn-success" onclick="addCategory()">💾 Guardar</button>
+                    <button class="btn btn-secondary" onclick="hideAddCategoryForm()">❌ Cancelar</button>
+                </div>
+                
+                <div id="categories-list">
+                    <div class="loading-message">🔄 Cargando categorías...</div>
+                </div>
+            </div>
+
+            <!-- Add Product Tab -->
+            <div id="add-product" class="tab-content">
+                <h2 id="form-title">➕ Añadir Nuevo Producto</h2>
+                
+                <div id="alertContainer"></div>
+                
+                <form id="product-form">
+                    <input type="hidden" id="product-id" value="">
+                    
+                    <div class="form-group">
+                        <label>Nombre del Producto *</label>
+                        <input type="text" id="product-name" required placeholder="Ej: iPhone 15 Pro Max">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Descripción Corta</label>
+                        <textarea id="product-desc" rows="3" placeholder="Descripción breve del producto..."></textarea>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Precio (S/.) *</label>
+                            <input type="number" id="product-price" step="0.01" min="0" required placeholder="0.00">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Categoría *</label>
+                            <select id="product-category" required>
+                                <option value="">Selecciona una categoría</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Descuento (%)</label>
+                            <input type="number" id="product-discount" min="0" max="100" value="0" placeholder="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Stock *</label>
+                            <input type="number" id="product-stock" min="0" value="0" required placeholder="0">
+                        </div>
+                    </div>
+                    
+                    <!-- Zona de Drag & Drop para Imágenes -->
+                    <div class="form-group">
+                        <label>Imágenes del Producto</label>
+                        
+                        <div id="drop-zone" class="drop-zone">
+                            <div class="drop-zone-content">
+                                <div class="drop-zone-icon">📷</div>
+                                <div class="drop-zone-text">Arrastra tus imágenes aquí</div>
+                                <div class="drop-zone-subtext">o haz clic para seleccionar archivos</div>
+                                <div class="drop-zone-subtext">Formatos: JPG, PNG, GIF - Máximo 5MB por imagen</div>
+                            </div>
+                        </div>
+                        
+                        <input type="file" id="imageInput" multiple accept="image/*" class="hidden">
+                        
+                        <div class="upload-progress" id="uploadProgress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                        
+                        <div id="imagePreview" class="image-preview"></div>
+                    </div>
+                    
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #eee;">
+                        <button type="submit" class="btn btn-success" id="submit-btn">💾 Guardar Producto</button>
+                        <button type="button" class="btn btn-secondary" onclick="cancelEdit()">❌ Cancelar</button>
+                        <button type="reset" class="btn btn-secondary">🗑️ Limpiar Formulario</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    <input type="file" id="csvFile" class="hidden-file-input" accept=".csv,.txt" />
     
-    <div class="csv-options">
-      <button id="downloadTemplate" class="template-btn">📥 Descargar Plantilla CSV</button>
-      <button id="importCsv" class="import-btn" style="display:none;">📤 Importar Productos</button>
-      <button id="cancelImport" class="cancel-btn" style="display:none;">❌ Cancelar</button>
-    </div>
-    
-    <div id="csvPreview" class="csv-preview" style="display:none;">
-      <h4>Vista previa (primeras 5 filas):</h4>
-      <div class="csv-table-container">
-        <table id="csvPreviewTable"></table>
-      </div>
-      <p id="csvStats"></p>
-    </div>
-  </div>
-  
-  <div id="list"></div>
-  <h3 id="form-title">Agregar producto</h3>
-  <input id="name" placeholder="Nombre del producto">
-  <textarea id="shortDesc" placeholder="Descripción corta"></textarea>
-  <input id="price" placeholder="Precio" type="number" step="0.01">
-  <input id="stock" placeholder="Cantidad en stock" type="number" min="0" step="1">
-  <select id="category"></select>
-  <input id="newCategory" placeholder="Nueva categoría (opcional)">
-  <input id="discount" placeholder="Descuento (%)" type="number" min="0" max="100">
-  
-  <!-- Nueva área de carga de imágenes -->
-  <div class="image-upload-area" id="uploadArea">
-    <div class="upload-icon">🖼️</div>
-    <div class="upload-text">Arrastra y suelta imágenes aquí</div>
-    <div class="upload-subtext">o haz clic para seleccionar archivos</div>
-  </div>
-  
-  <input type="file" id="image" class="hidden-file-input" multiple accept="image/*">
-  
-  <div class="image-options">
-    <label>O pega una URL:</label>
-    <input type="url" id="imageUrl" class="url-input" placeholder="https://ejemplo.com/imagen.jpg">
-    <button type="button" class="add-url-btn" id="addUrlBtn">Agregar URL</button>
-  </div>
-  
-  <div id="imagePreviewContainer" class="image-preview-container"></div>
-  
-  <button id="actionBtn" class="add-btn">Agregar</button>
-  <button id="cancelBtn" class="cancel-btn" style="display:none;">Cancelar</button>
-</div>
+    <script>
+        // ===== CONFIGURACIÓN GLOBAL =====
+        const API_BASE = 'http://localhost:4000/api';
+        let storeData = {
+            products: [],
+            categories: [],
+            config: {}
+        };
+        let uploadedImages = [];
 
-<script>
-function logout(){
-  fetch('/logout', { method: 'POST' }).then(() => window.location.href = '/login.html');
-}
-
-let products = [];
-let categories = [];
-let editId = null;
-let currentImages = []; // Array para múltiples imágenes
-let csvData = []; // Datos del CSV cargado
-
-// Configurar drag & drop para imágenes
-const uploadArea = document.getElementById('uploadArea');
-const fileInput = document.getElementById('image');
-const imageUrl = document.getElementById('imageUrl');
-const addUrlBtn = document.getElementById('addUrlBtn');
-const previewContainer = document.getElementById('imagePreviewContainer');
-
-// Configurar importador CSV
-const csvUploadArea = document.getElementById('csvUploadArea');
-const csvFileInput = document.getElementById('csvFile');
-const downloadTemplate = document.getElementById('downloadTemplate');
-const importCsv = document.getElementById('importCsv');
-const cancelImport = document.getElementById('cancelImport');
-const csvPreview = document.getElementById('csvPreview');
-
-// Eventos de drag & drop para imágenes
-uploadArea.addEventListener('click', () => fileInput.click());
-uploadArea.addEventListener('dragover', handleDragOver);
-uploadArea.addEventListener('dragleave', handleDragLeave);
-uploadArea.addEventListener('drop', handleDrop);
-fileInput.addEventListener('change', handleFileSelect);
-addUrlBtn.addEventListener('click', addImageUrl);
-
-// Eventos para importador CSV
-csvUploadArea.addEventListener('click', () => csvFileInput.click());
-csvUploadArea.addEventListener('dragover', handleCsvDragOver);
-csvUploadArea.addEventListener('dragleave', handleCsvDragLeave);
-csvUploadArea.addEventListener('drop', handleCsvDrop);
-csvFileInput.addEventListener('change', handleCsvFileSelect);
-downloadTemplate.addEventListener('click', downloadCsvTemplate);
-importCsv.addEventListener('click', importCsvData);
-cancelImport.addEventListener('click', cancelCsvImport);
-
-// Función para crear imagen de fallback
-function createFallbackImage() {
-    const div = document.createElement('div');
-    div.className = 'no-image-placeholder';
-    div.textContent = 'Sin imagen';
-    return div;
-}
-
-// Función mejorada para manejar errores de imagen
-function handleImageError(img, fallbackUrl = null) {
-    // Evitar loops infinitos
-    if (img.dataset.fallbackAttempted) {
-        const placeholder = createFallbackImage();
-        img.parentNode.replaceChild(placeholder, img);
-        return;
-    }
-
-    // Marcar que ya intentamos el fallback
-    img.dataset.fallbackAttempted = 'true';
-    
-    // Usar el fallback proporcionado o el por defecto
-    const defaultFallback = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23333%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-size%3D%228%22%20fill%3D%22%23666%22%3ESin%3C%2Ftext%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2265%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-size%3D%228%22%20fill%3D%22%23666%22%3EImagen%3C%2Ftext%3E%3C%2Fsvg%3E';
-    
-    img.src = fallbackUrl || defaultFallback;
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    uploadArea.classList.add('drag-over');
-}
-
-function handleDragLeave(e) {
-    e.preventDefault();
-    uploadArea.classList.remove('drag-over');
-}
-
-function handleDrop(e) {
-    e.preventDefault();
-    uploadArea.classList.remove('drag-over');
-    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
-    processFiles(files);
-}
-
-function handleFileSelect(e) {
-    const files = Array.from(e.target.files);
-    processFiles(files);
-}
-
-function processFiles(files) {
-    files.forEach(file => {
-        if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                addImageToPreview(e.target.result, 'file', file);
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-}
-
-function addImageUrl() {
-    const url = imageUrl.value.trim();
-    if (url && isValidImageUrl(url)) {
-        addImageToPreview(url, 'url');
-        imageUrl.value = '';
-    } else {
-        alert('Por favor, ingresa una URL válida de imagen');
-    }
-}
-
-function isValidImageUrl(url) {
-    try {
-        new URL(url);
-        return /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url) || 
-               url.includes('unsplash') || 
-               url.includes('imgur') ||
-               url.includes('picsum') ||
-               url.includes('cloudinary') ||
-               url.startsWith('data:image/') ||
-               url.startsWith('/') || // URLs relativas
-               url.startsWith('./'); // URLs relativas
-    } catch {
-        return false;
-    }
-}
-
-function addImageToPreview(src, type, file = null) {
-    const imageData = {
-        src: src,
-        type: type,
-        file: file,
-        id: Date.now() + Math.random()
-    };
-    
-    currentImages.push(imageData);
-    renderImagePreviews();
-}
-
-function removeImage(imageId) {
-    currentImages = currentImages.filter(img => img.id !== imageId);
-    renderImagePreviews();
-}
-
-function renderImagePreviews() {
-    previewContainer.innerHTML = '';
-    currentImages.forEach(imageData => {
-        const imageItem = document.createElement('div');
-        imageItem.className = 'image-item';
-        
-        const img = document.createElement('img');
-        img.src = imageData.src;
-        img.alt = 'Preview';
-        img.style.maxHeight = '80px';
-        img.style.maxWidth = '80px';
-        img.style.objectFit = 'cover';
-        img.style.borderRadius = '6px';
-        img.style.border = '2px solid #333';
-        img.onerror = function() { handleImageError(this); };
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'remove-image';
-        removeBtn.innerHTML = '&times;';
-        removeBtn.onclick = () => removeImage(imageData.id);
-        
-        imageItem.appendChild(img);
-        imageItem.appendChild(removeBtn);
-        previewContainer.appendChild(imageItem);
-    });
-}
-
-async function loadFromServer(){
-  try {
-    const res = await fetch('/api/data');
-    const data = await res.json();
-    products = data.products || [];
-    categories = data.categories?.map(c => c.name) || [];
-    
-    // LIMPIAR URLs PROBLEMÁTICAS DE PRODUCTOS EXISTENTES
-    let needsUpdate = false;
-    products = products.map(product => {
-      if (product.images && product.images.length > 0) {
-        const cleanImages = product.images.filter(img => 
-          !img.includes('via.placeholder.com') && 
-          !img.includes('placeholder.com') &&
-          img.trim() !== ''
-        );
-        
-        if (cleanImages.length !== product.images.length) {
-          product.images = cleanImages;
-          needsUpdate = true;
-        }
-      }
-      return product;
-    });
-    
-    // Si encontramos URLs problemáticas, guardar la versión limpia
-    if (needsUpdate) {
-      console.log('Limpiando URLs problemáticas de productos existentes...');
-      await saveToServer();
-    }
-    
-    render();
-    fillCategories();
-  } catch (error) {
-    console.error('Error cargando datos:', error);
-    alert('Error al cargar los datos del servidor');
-  }
-}
-
-function fillCategories(){
-  const sel = document.getElementById('category');
-  sel.innerHTML = '<option value="">Seleccionar categoría</option>';
-  categories.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c;
-    opt.textContent = c;
-    sel.appendChild(opt);
-  });
-}
-
-function render(){
-  const list = document.getElementById('list');
-  list.innerHTML = '';
-  
-  // Imagen por defecto que siempre funciona
-  const defaultImage = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23333%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-size%3D%228%22%20fill%3D%22%23666%22%3ESin%3C%2Ftext%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2265%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-size%3D%228%22%20fill%3D%22%23666%22%3EImagen%3C%2Ftext%3E%3C%2Fsvg%3E';
-  
-  products.forEach((p,i) => {
-    let imgSrc = defaultImage;
-    
-    // Solo usar imagen del producto si existe y es válida
-    if (p.images && p.images.length > 0) {
-      const validImage = p.images.find(img => 
-        img && 
-        img.trim() !== '' && 
-        !img.includes('via.placeholder.com') && 
-        !img.includes('placeholder.com')
-      );
-      
-      if (validImage) {
-        imgSrc = validImage;
-      }
-    }
-    
-    const discountTxt = p.discount ? ` (${p.discount}% desc.)` : '';
-    const stockTxt = p.stock !== undefined ? ` - Stock: ${p.stock}` : '';
-    
-    const productDiv = document.createElement('div');
-    productDiv.className = 'product';
-    
-    // Crear elementos por separado para mejor control
-    const span = document.createElement('span');
-    const img = document.createElement('img');
-    img.src = imgSrc;
-    img.alt = p.name || 'Producto';
-    img.style.maxHeight = '40px';
-    img.style.marginRight = '10px';
-    img.style.borderRadius = '4px';
-    img.onerror = function() { 
-      if (this.src !== defaultImage) {
-        this.src = defaultImage;
-      }
-    };
-    
-    const text = document.createTextNode(`${p.name} - S/.${p.price}${discountTxt}${stockTxt}`);
-    span.appendChild(img);
-    span.appendChild(text);
-    
-    const buttonDiv = document.createElement('div');
-    const editBtn = document.createElement('button');
-    editBtn.className = 'edit-btn';
-    editBtn.textContent = 'Editar';
-    editBtn.onclick = () => edit(i);
-    
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete-btn';
-    deleteBtn.textContent = 'Eliminar';
-    deleteBtn.onclick = () => del(i);
-    
-    buttonDiv.appendChild(editBtn);
-    buttonDiv.appendChild(deleteBtn);
-    
-    productDiv.appendChild(span);
-    productDiv.appendChild(buttonDiv);
-    list.appendChild(productDiv);
-  });
-}
-
-function del(i){
-  if (confirm('¿Estás seguro de que quieres eliminar este producto?')) {
-    products.splice(i,1);
-    saveToServer();
-    render();
-  }
-}
-
-function edit(i){
-  const p = products[i];
-  editId = p.id;
-  document.getElementById('name').value = p.name;
-  document.getElementById('shortDesc').value = p.shortDesc || '';
-  document.getElementById('price').value = p.price;
-  document.getElementById('stock').value = p.stock !== undefined ? p.stock : 0;
-  document.getElementById('category').value = p.category || '';
-  document.getElementById('discount').value = p.discount || '';
-  
-  // Cargar imágenes existentes
-  currentImages = [];
-  if (p.images && p.images.length) {
-    p.images.forEach(imgUrl => {
-      addImageToPreview(imgUrl, 'url');
-    });
-  }
-  
-  document.getElementById('form-title').textContent = 'Editar producto';
-  document.getElementById('actionBtn').textContent = 'Guardar cambios';
-  document.getElementById('actionBtn').className = 'save-btn';
-  document.getElementById('cancelBtn').style.display = 'inline-block';
-}
-
-document.getElementById('cancelBtn').onclick = () => resetForm();
-
-function resetForm(){
-  editId = null;
-  currentImages = [];
-  document.getElementById('name').value = '';
-  document.getElementById('shortDesc').value = '';
-  document.getElementById('price').value = '';
-  document.getElementById('stock').value = '';
-  document.getElementById('newCategory').value = '';
-  document.getElementById('discount').value = '';
-  document.getElementById('image').value = '';
-  document.getElementById('imageUrl').value = '';
-  renderImagePreviews();
-  document.getElementById('form-title').textContent = 'Agregar producto';
-  document.getElementById('actionBtn').textContent = 'Agregar';
-  document.getElementById('actionBtn').className = 'add-btn';
-  document.getElementById('cancelBtn').style.display = 'none';
-}
-
-document.getElementById('actionBtn').onclick = async () => {
-  const name = document.getElementById('name').value.trim();
-  const shortDesc = document.getElementById('shortDesc').value.trim();
-  const price = parseFloat(document.getElementById('price').value);
-  const stock = parseInt(document.getElementById('stock').value) || 0;
-  let category = document.getElementById('category').value;
-  const newCategory = document.getElementById('newCategory').value.trim();
-  
-  if(newCategory){
-    if (!categories.includes(newCategory)) {
-      categories.push(newCategory);
-      category = newCategory;
-      fillCategories();
-    }
-  }
-  
-  const discount = parseInt(document.getElementById('discount').value) || null;
-
-  if(!name || isNaN(price)) {
-    alert('Por favor, completa el nombre y precio del producto');
-    return;
-  }
-
-  if (price <= 0) {
-    alert('El precio debe ser mayor a 0');
-    return;
-  }
-
-  // Procesar imágenes
-  let finalImages = [];
-  
-  try {
-    document.getElementById('actionBtn').textContent = 'Procesando...';
-    document.getElementById('actionBtn').disabled = true;
-    
-    for (const imageData of currentImages) {
-      if (imageData.type === 'file' && imageData.file) {
-        // Subir archivo
-        const formData = new FormData();
-        formData.append('images', imageData.file);
-        try {
-          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-          const uploadData = await uploadRes.json();
-          if (uploadData.urls && uploadData.urls[0]) {
-            finalImages.push(uploadData.urls[0]);
-          }
-        } catch (uploadError) {
-          console.warn('Error subiendo imagen:', uploadError);
-          // Si falla la subida, usar la URL de datos
-          finalImages.push(imageData.src);
-        }
-      } else if (imageData.type === 'url') {
-        // Usar URL directamente
-        finalImages.push(imageData.src);
-      }
-    }
-
-    const productData = {
-      id: editId || Date.now(),
-      name,
-      shortDesc,
-      price,
-      stock,
-      category,
-      discount,
-      images: finalImages
-    };
-
-    if(editId){
-      // Actualizar producto existente
-      try {
-        await fetch(`/api/products/${editId}`, {
-          method: 'PUT',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(productData)
+        // ===== INICIALIZACIÓN =====
+        document.addEventListener('DOMContentLoaded', function() {
+            testConnection();
+            loadData();
         });
-      } catch (error) {
-        console.warn('Error en API, actualizando localmente:', error);
-      }
-      
-      const idx = products.findIndex(p => p.id === editId);
-      if (idx !== -1) {
-        products[idx] = productData;
-      }
-    } else {
-      // Agregar nuevo producto
-      products.push(productData);
-    }
 
-    await saveToServer();
-    render();
-    resetForm();
-    alert(editId ? 'Producto actualizado correctamente' : 'Producto agregado correctamente');
-    
-  } catch (error) {
-    console.error('Error procesando producto:', error);
-    alert('Error al procesar el producto. Inténtalo de nuevo.');
-  } finally {
-    document.getElementById('actionBtn').textContent = editId ? 'Guardar cambios' : 'Agregar';
-    document.getElementById('actionBtn').disabled = false;
-  }
-};
-
-async function saveToServer(){
-  try {
-    const res = await fetch('/api/data');
-    let data = await res.json();
-    data.products = products;
-    data.categories = categories.map((name, i) => ({id: i+1, name, label: name}));
-    
-    await fetch('/api/saveAll', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(data)
-    });
-  } catch (error) {
-    console.error('Error guardando en servidor:', error);
-    alert('Error al guardar los cambios en el servidor');
-  }
-}
-
-// Prevenir comportamiento por defecto del navegador para drag & drop
-window.addEventListener('dragover', e => e.preventDefault());
-window.addEventListener('drop', e => e.preventDefault());
-
-// Cargar datos al iniciar
-loadFromServer();
-
-// ===== FUNCIONES PARA IMPORTADOR CSV =====
-
-function handleCsvDragOver(e) {
-    e.preventDefault();
-    csvUploadArea.classList.add('drag-over');
-}
-
-function handleCsvDragLeave(e) {
-    e.preventDefault();
-    csvUploadArea.classList.remove('drag-over');
-}
-
-function handleCsvDrop(e) {
-    e.preventDefault();
-    csvUploadArea.classList.remove('drag-over');
-    const files = Array.from(e.dataTransfer.files).filter(file => 
-        file.type === 'text/csv' || file.name.endsWith('.csv') || file.type === 'text/plain'
-    );
-    if (files.length > 0) {
-        processCsvFile(files[0]);
-    }
-}
-
-function handleCsvFileSelect(e) {
-    const file = e.target.files[0];
-    if (file) {
-        processCsvFile(file);
-    }
-}
-
-function processCsvFile(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const csvContent = e.target.result;
-        parseCsvContent(csvContent);
-    };
-    reader.readAsText(file, 'UTF-8');
-}
-
-function parseCsvContent(csvContent) {
-    try {
-        // Parsear CSV simple - dividir por líneas y luego por comas
-        const lines = csvContent.trim().split('\n');
-        if (lines.length < 2) {
-            alert('El archivo CSV debe tener al menos una fila de encabezados y una fila de datos');
-            return;
-        }
-
-        // Detectar el separador (coma o punto y coma)
-        const separator = lines[0].includes(';') ? ';' : ',';
-        
-        // Parsear encabezados
-        const headers = lines[0].split(separator).map(h => h.trim().replace(/"/g, ''));
-        
-        // Parsear datos
-        const data = [];
-        for (let i = 1; i < lines.length; i++) {
-            if (lines[i].trim()) {
-                const values = parseCsvLine(lines[i], separator);
-                const row = {};
-                headers.forEach((header, index) => {
-                    row[header] = values[index] || '';
-                });
-                data.push(row);
-            }
-        }
-
-        csvData = data;
-        showCsvPreview(headers, data);
-        
-    } catch (error) {
-        console.error('Error parsing CSV:', error);
-        alert('Error al procesar el archivo CSV. Asegúrate de que esté en el formato correcto.');
-    }
-}
-
-function parseCsvLine(line, separator) {
-    const values = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        
-        if (char === '"') {
-            inQuotes = !inQuotes;
-        } else if (char === separator && !inQuotes) {
-            values.push(current.trim());
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    
-    values.push(current.trim());
-    return values.map(v => v.replace(/"/g, ''));
-}
-
-function showCsvPreview(headers, data) {
-    const table = document.getElementById('csvPreviewTable');
-    const stats = document.getElementById('csvStats');
-    
-    // Limpiar tabla
-    table.innerHTML = '';
-    
-    // Crear encabezados
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    headers.forEach(header => {
-        const th = document.createElement('th');
-        th.textContent = header;
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-    
-    // Crear filas de datos (máximo 5 para preview)
-    const tbody = document.createElement('tbody');
-    const previewData = data.slice(0, 5);
-    previewData.forEach(row => {
-        const tr = document.createElement('tr');
-        headers.forEach(header => {
-            const td = document.createElement('td');
-            td.textContent = row[header] || '';
-            tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    
-    // Mostrar estadísticas
-    stats.textContent = `Total de productos a importar: ${data.length}`;
-    
-    // Mostrar preview y botones
-    csvPreview.style.display = 'block';
-    importCsv.style.display = 'inline-block';
-    cancelImport.style.display = 'inline-block';
-}
-
-function downloadCsvTemplate() {
-    const template = `nombre,descripcion,precio,stock,categoria,descuento,imagen_url
-"Producto Ejemplo 1","Descripción del producto 1",29.99,10,"Electrónicos",15,"data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22200%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%234CAF50%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-size%3D%2216%22%20fill%3D%22white%22%3EProducto%201%3C%2Ftext%3E%3C%2Fsvg%3E"
-"Producto Ejemplo 2","Descripción del producto 2",45.50,5,"Ropa",0,"data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22200%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%232196F3%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-size%3D%2216%22%20fill%3D%22white%22%3EProducto%202%3C%2Ftext%3E%3C%2Fsvg%3E"
-"Producto Ejemplo 3","Descripción del producto 3",12.99,20,"Hogar",10,"data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22200%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23FF9800%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dominant-baseline%3D%22central%22%20text-anchor%3D%22middle%22%20font-size%3D%2216%22%20fill%3D%22white%22%3EProducto%203%3C%2Ftext%3E%3C%2Fsvg%3E"`;
-
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'plantilla_productos.csv';
-    link.click();
-}
-
-async function importCsvData() {
-    if (!csvData || csvData.length === 0) {
-        alert('No hay datos para importar');
-        return;
-    }
-
-    const confirmMsg = `¿Estás seguro de importar ${csvData.length} productos? Esta acción agregará todos los productos a tu catálogo.`;
-    if (!confirm(confirmMsg)) {
-        return;
-    }
-
-    importCsv.textContent = 'Importando...';
-    importCsv.disabled = true;
-
-    try {
-        let importedCount = 0;
-        let errorCount = 0;
-        const errors = [];
-
-        for (let i = 0; i < csvData.length; i++) {
-            const row = csvData[i];
+        // ===== CONEXIÓN AL SERVIDOR =====
+        async function testConnection() {
+            const statusEl = document.getElementById('connectionStatus');
             
             try {
-                // Mapear campos del CSV a campos del producto
-                const name = row.nombre || row.name || '';
-                const shortDesc = row.descripcion || row.description || row.desc || '';
-                const price = parseFloat(row.precio || row.price || 0);
-                const stock = parseInt(row.stock || row.cantidad || 0);
-                const category = row.categoria || row.category || '';
-                const discount = parseInt(row.descuento || row.discount || 0);
-                const imageUrl = row.imagen_url || row.image_url || row.imagen || row.image || '';
-
-                // Validar campos obligatorios
-                if (!name.trim()) {
-                    errors.push(`Fila ${i + 2}: Falta el nombre del producto`);
-                    errorCount++;
-                    continue;
+                statusEl.textContent = '🔄 Conectando...';
+                statusEl.className = 'connection-status loading';
+                
+                const response = await fetch(`${API_BASE}/test`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusEl.textContent = '✅ Conectado';
+                    statusEl.className = 'connection-status connected';
+                    document.getElementById('last-update').textContent = new Date().toLocaleString();
+                } else {
+                    throw new Error('Test falló');
                 }
-
-                if (isNaN(price) || price <= 0) {
-                    errors.push(`Fila ${i + 2}: Precio inválido (${row.precio || row.price})`);
-                    errorCount++;
-                    continue;
-                }
-
-                // Crear producto
-                const productData = {
-                    id: Date.now() + i,
-                    name: name.trim(),
-                    shortDesc: shortDesc.trim(),
-                    price: price,
-                    stock: stock || 0,
-                    category: category.trim(),
-                    discount: (discount > 0 && discount <= 100) ? discount : null,
-                    images: imageUrl.trim() ? [imageUrl.trim()] : []
-                };
-
-                // Agregar categoría si no existe
-                if (category.trim() && !categories.includes(category.trim())) {
-                    categories.push(category.trim());
-                }
-
-                products.push(productData);
-                importedCount++;
-
             } catch (error) {
-                errors.push(`Fila ${i + 2}: Error procesando producto - ${error.message}`);
-                errorCount++;
+                console.error('Error de conexión:', error);
+                statusEl.textContent = '❌ Sin conexión';
+                statusEl.className = 'connection-status disconnected';
+                showAlert('Error conectando al servidor. Verifica que esté corriendo en puerto 4000.', 'error');
             }
         }
 
-        // Guardar en servidor
-        await saveToServer();
-        
-        // Actualizar UI
-        render();
-        fillCategories();
-        cancelCsvImport();
-
-        // Mostrar resultado
-        let message = `Importación completada:\n✅ ${importedCount} productos importados`;
-        if (errorCount > 0) {
-            message += `\n❌ ${errorCount} errores`;
-            if (errors.length <= 5) {
-                message += `\n\nErrores:\n${errors.join('\n')}`;
-            } else {
-                message += `\n\nPrimeros errores:\n${errors.slice(0, 5).join('\n')}\n... y ${errors.length - 5} más`;
+        // ===== CARGAR DATOS =====
+        async function loadData() {
+            try {
+                const response = await fetch(`${API_BASE}/data`);
+                const data = await response.json();
+                
+                storeData = data;
+                updateStats();
+                updateCategorySelect();
+                
+                console.log('✅ Datos cargados:', data);
+            } catch (error) {
+                console.error('Error cargando datos:', error);
+                showAlert('Error cargando datos del servidor', 'error');
             }
         }
-        
-        alert(message);
 
-    } catch (error) {
-        console.error('Error importando CSV:', error);
-        alert('Error durante la importación. Por favor, inténtalo de nuevo.');
-    } finally {
-        importCsv.textContent = '📤 Importar Productos';
-        importCsv.disabled = false;
-    }
-}
+        // ===== ESTADÍSTICAS =====
+        function updateStats() {
+            const { products, categories } = storeData;
+            
+            document.getElementById('total-products').textContent = products.length;
+            document.getElementById('total-categories').textContent = categories.length;
+            
+            const lowStock = products.filter(p => p.stock < 10).length;
+            document.getElementById('low-stock').textContent = lowStock;
+            
+            const totalValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
+            document.getElementById('total-value').textContent = `S/. ${totalValue.toFixed(0)}`;
+        }
 
-function cancelCsvImport() {
-    csvData = [];
-    csvPreview.style.display = 'none';
-    importCsv.style.display = 'none';
-    cancelImport.style.display = 'none';
-    csvFileInput.value = '';
-}
+        // ===== GESTIÓN DE PESTAÑAS =====
+        function showTab(tabName) {
+            // Ocultar todas las pestañas
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remover clase active de todos los botones
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Mostrar pestaña seleccionada
+            document.getElementById(tabName).classList.add('active');
+            
+            // Activar botón correspondiente
+            event.target.classList.add('active');
 
-// Hacer las funciones globales para que puedan ser llamadas desde el HTML
-window.handleImageError = handleImageError;
-window.removeImage = removeImage;
-window.edit = edit;
-window.del = del;
+            // Cargar datos específicos según la pestaña
+            if (tabName === 'products') loadProducts();
+            if (tabName === 'categories') loadCategories();
+        }
+
+        // ===== GESTIÓN DE PRODUCTOS =====
+        async function loadProducts() {
+            const productsList = document.getElementById('products-list');
+            const productsCount = document.getElementById('products-count');
+            
+            productsList.innerHTML = '<div class="loading-message">🔄 Cargando productos...</div>';
+            
+            try {
+                await loadData(); // Recargar datos
+                const { products } = storeData;
+                
+                if (products.length === 0) {
+                    productsList.innerHTML = `
+                        <div class="no-products">
+                            <div class="no-products-icon">📦</div>
+                            <h3>No hay productos</h3>
+                            <p>Agrega tu primer producto usando la pestaña "Añadir Producto"</p>
+                        </div>
+                    `;
+                } else {
+                    let html = '';
+                    products.forEach(product => {
+                        const mainImage = product.images && product.images.length > 0 
+                            ? product.images[0] 
+                            : null;
+                        
+                        const stockStatus = product.stock < 10 ? '⚠️ Stock bajo' : `${product.stock} disponibles`;
+                        const finalPrice = product.discount > 0 
+                            ? product.price * (1 - product.discount / 100)
+                            : product.price;
+                        
+                        html += `
+                            <div class="product-card">
+                                <div class="product-image">
+                                    ${mainImage 
+                                        ? `<img src="${mainImage}" alt="${product.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">` 
+                                        : '📷'
+                                    }
+                                </div>
+                                <div class="product-info">
+                                    <div class="product-name">${product.name}</div>
+                                    <div class="product-desc">${product.shortDesc || 'Sin descripción'}</div>
+                                    <div class="product-price">
+                                        ${product.discount > 0 
+                                            ? `<span style="text-decoration: line-through; color: #999; font-size: 14px;">S/. ${product.price.toFixed(2)}</span> S/. ${finalPrice.toFixed(2)}`
+                                            : `S/. ${product.price.toFixed(2)}`
+                                        }
+                                    </div>
+                                    <div class="product-meta">
+                                        📂 ${getCategoryLabel(product.category)} | 📦 ${stockStatus} | 🆔 #${product.id}
+                                    </div>
+                                </div>
+                                <div class="product-actions">
+                                    <button class="btn btn-warning btn-small" onclick="editProduct(${product.id})">✏️ Editar</button>
+                                    <button class="btn btn-danger btn-small" onclick="deleteProduct(${product.id})">🗑️ Eliminar</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    productsList.innerHTML = html;
+                }
+                
+                productsCount.textContent = `${products.length} productos encontrados`;
+                
+            } catch (error) {
+                console.error('Error cargando productos:', error);
+                productsList.innerHTML = '<div class="loading-message">❌ Error cargando productos</div>';
+            }
+        }
+
+        function getCategoryLabel(categoryName) {
+            const category = storeData.categories.find(c => c.name === categoryName);
+            return category ? category.label : categoryName;
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/products/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Producto eliminado correctamente');
+                    loadProducts();
+                    loadData(); // Actualizar stats
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('Error eliminando producto:', error);
+                showAlert('Error eliminando producto: ' + error.message, 'error');
+            }
+        }
+
+        function editProduct(id) {
+            const product = storeData.products.find(p => p.id === id);
+            if (!product) {
+                showAlert('Producto no encontrado', 'error');
+                return;
+            }
+            
+            // Cambiar a la pestaña de añadir producto
+            showTab('add-product');
+            
+            // Cambiar el título y botón
+            document.getElementById('form-title').textContent = '✏️ Editar Producto';
+            document.getElementById('submit-btn').textContent = '💾 Actualizar Producto';
+            
+            // Llenar el formulario con los datos existentes
+            document.getElementById('product-id').value = product.id;
+            document.getElementById('product-name').value = product.name;
+            document.getElementById('product-desc').value = product.shortDesc || '';
+            document.getElementById('product-price').value = product.price;
+            document.getElementById('product-category').value = product.category;
+            document.getElementById('product-discount').value = product.discount || 0;
+            document.getElementById('product-stock').value = product.stock || 0;
+            
+            // Cargar imágenes existentes
+            uploadedImages = [...(product.images || [])];
+            loadExistingImages(product.images || []);
+            
+            // Scroll hacia arriba para mostrar el formulario
+            document.querySelector('.container').scrollIntoView({ behavior: 'smooth' });
+            
+            showAlert(`Editando producto: ${product.name}`, 'success');
+        }
+
+        function loadExistingImages(images) {
+            const imagePreview = document.getElementById('imagePreview');
+            imagePreview.innerHTML = '';
+            
+            images.forEach(imageUrl => {
+                addImageToPreview(imageUrl, imageUrl);
+            });
+        }
+
+        function cancelEdit() {
+            // Resetear formulario
+            document.getElementById('product-form').reset();
+            document.getElementById('product-id').value = '';
+            uploadedImages = [];
+            document.getElementById('imagePreview').innerHTML = '';
+            
+            // Restaurar títulos
+            document.getElementById('form-title').textContent = '➕ Añadir Nuevo Producto';
+            document.getElementById('submit-btn').textContent = '💾 Guardar Producto';
+            
+            // Limpiar alertas
+            document.getElementById('alertContainer').innerHTML = '';
+            
+            showAlert('Edición cancelada');
+        }
+
+        function exportProducts() {
+            const dataStr = JSON.stringify(storeData.products, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `productos_${new Date().getTime()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showAlert('Productos exportados correctamente');
+        }
+
+        // ===== GESTIÓN DE CATEGORÍAS =====
+        async function loadCategories() {
+            const categoriesList = document.getElementById('categories-list');
+            
+            categoriesList.innerHTML = '<div class="loading-message">🔄 Cargando categorías...</div>';
+            
+            try {
+                await loadData(); // Recargar datos
+                const { categories } = storeData;
+                
+                if (categories.length === 0) {
+                    categoriesList.innerHTML = `
+                        <div class="no-products">
+                            <div class="no-products-icon">📂</div>
+                            <h3>No hay categorías</h3>
+                            <p>Agrega tu primera categoría</p>
+                        </div>
+                    `;
+                } else {
+                    let html = '';
+                    categories.forEach(category => {
+                        const productCount = storeData.products.filter(p => p.category === category.name).length;
+                        html += `
+                            <div class="category-card">
+                                <div>
+                                    <strong>${category.label}</strong>
+                                    <div style="font-size: 12px; color: #666;">
+                                        ID: ${category.name} | ${productCount} productos
+                                    </div>
+                                </div>
+                                <div>
+                                    <button class="btn btn-danger btn-small" onclick="deleteCategory(${category.id})">🗑️ Eliminar</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    categoriesList.innerHTML = html;
+                }
+                
+            } catch (error) {
+                console.error('Error cargando categorías:', error);
+                categoriesList.innerHTML = '<div class="loading-message">❌ Error cargando categorías</div>';
+            }
+        }
+
+        function showAddCategoryForm() {
+            document.getElementById('add-category-form').classList.remove('hidden');
+        }
+
+        function hideAddCategoryForm() {
+            document.getElementById('add-category-form').classList.add('hidden');
+            document.getElementById('category-name').value = '';
+            document.getElementById('category-label').value = '';
+        }
+
+        async function addCategory() {
+            const name = document.getElementById('category-name').value.trim();
+            const label = document.getElementById('category-label').value.trim();
+            
+            if (!name || !label) {
+                showAlert('Por favor completa todos los campos', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/categories`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, label })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Categoría agregada correctamente');
+                    hideAddCategoryForm();
+                    loadCategories();
+                    loadData(); // Actualizar datos globales
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('Error agregando categoría:', error);
+                showAlert('Error agregando categoría: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm('¿Estás seguro de eliminar esta categoría?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/categories/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Categoría eliminada correctamente');
+                    loadCategories();
+                    loadData(); // Actualizar datos globales
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('Error eliminando categoría:', error);
+                showAlert('Error eliminando categoría: ' + error.message, 'error');
+            }
+        }
+
+        function updateCategorySelect() {
+            const select = document.getElementById('product-category');
+            select.innerHTML = '<option value="">Selecciona una categoría</option>';
+            
+            storeData.categories.forEach(category => {
+                select.innerHTML += `<option value="${category.name}">${category.label}</option>`;
+            });
+        }
+
+        // ===== DRAG & DROP DE IMÁGENES =====
+        const dropZone = document.getElementById('drop-zone');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressFill = document.getElementById('progressFill');
+
+        // Eventos del drag & drop
+        dropZone.addEventListener('click', () => {
+            imageInput.click();
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files).filter(file => 
+                file.type.startsWith('image/')
+            );
+            
+            if (files.length > 0) {
+                handleImageUpload(files);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                handleImageUpload(files);
+            }
+        });
+
+        // Función para manejar la subida de imágenes al servidor real
+        async function handleImageUpload(files) {
+            // Validar archivos
+            const validFiles = files.filter(file => {
+                if (!file.type.startsWith('image/')) {
+                    showAlert(`${file.name} no es una imagen válida`, 'error');
+                    return false;
+                }
+                if (file.size > 5 * 1024 * 1024) { // 5MB máximo
+                    showAlert(`${file.name} es demasiado grande (máximo 5MB)`, 'error');
+                    return false;
+                }
+                return true;
+            });
+
+            if (validFiles.length === 0) return;
+
+            // Mostrar progreso
+            uploadProgress.style.display = 'block';
+            progressFill.style.width = '0%';
+            
+            try {
+                const formData = new FormData();
+                validFiles.forEach(file => {
+                    formData.append('images', file);
+                });
+                
+                // Simular progreso
+                progressFill.style.width = '50%';
+                
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Completar progreso
+                    progressFill.style.width = '100%';
+                    
+                    // Añadir URLs al array de imágenes
+                    result.urls.forEach(url => {
+                        const fullUrl = `http://localhost:4000${url}`;
+                        uploadedImages.push(fullUrl);
+                        addImageToPreview(fullUrl, url);
+                    });
+                    
+                    showAlert(`${validFiles.length} imagen(es) subida(s) correctamente!`);
+                } else {
+                    throw new Error(result.message || 'Error desconocido');
+                }
+                
+            } catch (error) {
+                console.error('Error subiendo imágenes:', error);
+                showAlert(`Error subiendo imágenes: ${error.message}`, 'error');
+            } finally {
+                // Ocultar progreso después de un delay
+                setTimeout(() => {
+                    uploadProgress.style.display = 'none';
+                    progressFill.style.width = '0%';
+                }, 1000);
+            }
+        }
+
+        // Añadir imagen al preview
+        function addImageToPreview(fullUrl, shortUrl) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'image-wrapper';
+            wrapper.dataset.imageUrl = fullUrl;
+            
+            wrapper.innerHTML = `
+                <img src="${fullUrl}" alt="Imagen del producto">
+                <button type="button" class="image-remove" onclick="removeImage('${fullUrl}')">×</button>
+            `;
+            
+            imagePreview.appendChild(wrapper);
+        }
+
+        // Remover imagen
+        function removeImage(imageUrl) {
+            // Remover del array
+            uploadedImages = uploadedImages.filter(url => url !== imageUrl);
+            
+            // Remover del DOM
+            const wrapper = document.querySelector(`[data-image-url="${imageUrl}"]`);
+            if (wrapper) {
+                wrapper.remove();
+            }
+            
+            showAlert('Imagen eliminada del preview (no se elimina del servidor)');
+        }
+
+        // ===== FORMULARIO DE PRODUCTOS =====
+        document.getElementById('product-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const productId = document.getElementById('product-id').value;
+            const isEditing = !!productId;
+            
+            const formData = {
+                name: document.getElementById('product-name').value.trim(),
+                shortDesc: document.getElementById('product-desc').value.trim(),
+                price: parseFloat(document.getElementById('product-price').value),
+                category: document.getElementById('product-category').value,
+                discount: parseInt(document.getElementById('product-discount').value) || 0,
+                stock: parseInt(document.getElementById('product-stock').value),
+                images: uploadedImages
+            };
+            
+            // Validaciones
+            if (!formData.name || !formData.category || !formData.price || formData.stock < 0) {
+                showAlert('Por favor completa todos los campos obligatorios', 'error');
+                return;
+            }
+            
+            try {
+                let response;
+                
+                if (isEditing) {
+                    // ACTUALIZAR producto existente
+                    response = await fetch(`${API_BASE}/products/${productId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                } else {
+                    // CREAR producto nuevo
+                    response = await fetch(`${API_BASE}/products`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (isEditing) {
+                        showAlert(`✅ Producto "${formData.name}" actualizado correctamente!`);
+                    } else {
+                        showAlert(`✅ Producto "${formData.name}" creado correctamente!`);
+                    }
+                    
+                    // Limpiar formulario
+                    document.getElementById('product-form').reset();
+                    document.getElementById('product-id').value = '';
+                    uploadedImages = [];
+                    document.getElementById('imagePreview').innerHTML = '';
+                    
+                    // Restaurar títulos
+                    document.getElementById('form-title').textContent = '➕ Añadir Nuevo Producto';
+                    document.getElementById('submit-btn').textContent = '💾 Guardar Producto';
+                    
+                    // Actualizar datos
+                    loadData();
+                    
+                    // Si estaba editando, regresar a la lista de productos
+                    if (isEditing) {
+                        setTimeout(() => {
+                            showTab('products');
+                        }, 1500);
+                    }
+                    
+                    console.log('Operación exitosa:', result.product);
+                } else {
+                    throw new Error(result.error || 'Error desconocido');
+                }
+                
+            } catch (error) {
+                console.error('Error procesando producto:', error);
+                const action = isEditing ? 'actualizando' : 'creando';
+                showAlert(`Error ${action} producto: ${error.message}`, 'error');
+            }
+        });
+
+        // Limpiar formulario
+        document.getElementById('product-form').addEventListener('reset', () => {
+            uploadedImages = [];
+            document.getElementById('imagePreview').innerHTML = '';
+            document.getElementById('product-id').value = '';
+            
+            // Restaurar títulos
+            document.getElementById('form-title').textContent = '➕ Añadir Nuevo Producto';
+            document.getElementById('submit-btn').textContent = '💾 Guardar Producto';
+            
+            // Limpiar alertas
+            document.getElementById('alertContainer').innerHTML = '';
+        });
+
+        // ===== UTILIDADES =====
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+            
+            alertContainer.innerHTML = `
+                <div class="alert ${alertClass}">
+                    ${message}
+                </div>
+            `;
+            
+            // Auto-ocultar después de 5 segundos
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+            
+            // Scroll hacia arriba para mostrar la alerta
+            alertContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    </script>
+</body>
+</html>
