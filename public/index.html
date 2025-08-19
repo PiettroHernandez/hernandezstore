@@ -599,10 +599,23 @@
         text-align: center;
         padding: 4rem 2rem;
         color: var(--muted);
+        grid-column: 1 / -1;
     }
     
     .loading-state h3 {
         color: var(--accent);
+        margin-bottom: 1rem;
+    }
+    
+    .error-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--danger);
+        grid-column: 1 / -1;
+    }
+    
+    .error-state h3 {
+        color: var(--danger);
         margin-bottom: 1rem;
     }
     
@@ -679,7 +692,9 @@
     <strong>Bienvenido a HernándezStore</strong> 🛍️
 </div>
 <div class="top-bar" id="topBar">
-    <div class="categories" id="categoryButtons"></div>
+    <div class="categories" id="categoryButtons">
+        <button onclick="filterByCategory('all')" class="active">Todos</button>
+    </div>
     <div class="search-box">
         <input type="text" id="searchInput" placeholder="Buscar producto...">
     </div>
@@ -740,6 +755,9 @@
 </footer>
 
 <script>
+// ================================
+// VARIABLES GLOBALES
+// ================================
 let allProducts = [];
 let filteredProducts = [];
 let categories = [];
@@ -750,10 +768,21 @@ let currentQuantity = 1;
 let currentGalleryProduct = null;
 let currentImageIndex = 0;
 
-// Cargar productos desde la API real
+// ================================
+// FUNCIONES PRINCIPALES
+// ================================
+
+// Cargar productos desde la API
 async function loadProducts(){
+    console.log('🔄 Iniciando carga de productos...');
+    
     try {
         const container = document.getElementById('productos');
+        if (!container) {
+            console.error('❌ Contenedor #productos no encontrado');
+            return;
+        }
+        
         container.innerHTML = `
             <div class="loading-state">
                 <h3>Cargando productos...</h3>
@@ -761,41 +790,102 @@ async function loadProducts(){
             </div>
         `;
         
+        console.log('🌐 Realizando petición a /api/data...');
         const response = await fetch('/api/data');
-        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-        const data = await response.json();
         
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('📦 Datos recibidos:', data);
+        
+        // Procesar productos
         allProducts = data.products || [];
         categories = data.categories || [];
+        
+        console.log(`✅ ${allProducts.length} productos cargados`);
+        console.log(`🏷️ ${categories.length} categorías cargadas`);
         
         if (allProducts.length === 0) {
             container.innerHTML = `
                 <div class="loading-state">
                     <h3>No hay productos disponibles</h3>
                     <p>Pronto añadiremos productos a la tienda 🛍️</p>
+                    <p><strong>💡 Tip:</strong> Ve al <a href="/admin" style="color: var(--accent);">panel admin</a> para agregar productos</p>
                 </div>
             `;
             return;
         }
         
+        // Procesar datos de productos
+        allProducts = allProducts.map(product => {
+            // Asegurar que tiene imagen
+            if (!product.image && product.images && product.images.length > 0) {
+                product.image = product.images[0];
+            } else if (!product.image) {
+                product.image = '/uploads/placeholder.jpg';
+            }
+            
+            // Asegurar que tiene descripción
+            if (!product.description && product.shortDesc) {
+                product.description = product.shortDesc;
+            } else if (!product.description) {
+                product.description = 'Producto disponible en HernándezStore';
+            }
+            
+            // Calcular precio original si hay descuento
+            if (product.discount && product.discount > 0) {
+                product.originalPrice = product.price / (1 - product.discount / 100);
+            }
+            
+            // Asegurar stock
+            if (typeof product.stock !== 'number') {
+                product.stock = 0;
+            }
+            
+            return product;
+        });
+        
         renderCategories();
         filteredProducts = [...allProducts];
         renderProducts(filteredProducts);
+        setupEventListeners();
+        
+        console.log('🎉 Carga de productos completada exitosamente');
         
     } catch(err) {
-        console.error("Error al cargar productos:", err);
-        document.getElementById('productos').innerHTML = `
-            <div class="loading-state">
-                <h3>Error al cargar productos</h3>
-                <p>Por favor, recarga la página</p>
-            </div>
-        `;
+        console.error("❌ Error al cargar productos:", err);
+        const container = document.getElementById('productos');
+        if (container) {
+            container.innerHTML = `
+                <div class="error-state">
+                    <h3>Error al cargar productos</h3>
+                    <p>Error: ${err.message}</p>
+                    <p>Por favor, verifica:</p>
+                    <ul style="text-align: left; max-width: 400px; margin: 0 auto;">
+                        <li>Que el servidor esté funcionando</li>
+                        <li>Que la URL de la API sea correcta</li>
+                        <li>Que tengas productos en la base de datos</li>
+                    </ul>
+                    <button onclick="loadProducts()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: var(--accent); color: #000; border: none; border-radius: 5px; cursor: pointer;">
+                        🔄 Reintentar
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
 // Renderizar categorías
 function renderCategories() {
+    console.log('🏷️ Renderizando categorías...');
     const container = document.getElementById('categoryButtons');
+    if (!container) {
+        console.error('❌ Contenedor #categoryButtons no encontrado');
+        return;
+    }
+    
     container.innerHTML = `
         <button onclick="filterByCategory('all')" class="active">Todos</button>
         ${categories.map(cat => `<button onclick="filterByCategory('${cat}')">${cat}</button>`).join('')}
@@ -804,7 +894,13 @@ function renderCategories() {
 
 // Renderizar productos
 function renderProducts(products) {
+    console.log(`🎨 Renderizando ${products.length} productos...`);
     const container = document.getElementById('productos');
+    if (!container) {
+        console.error('❌ Contenedor #productos no encontrado');
+        return;
+    }
+    
     if (products.length === 0) {
         container.innerHTML = `
             <div class="loading-state">
@@ -816,6 +912,7 @@ function renderProducts(products) {
     }
     
     container.innerHTML = products.map(product => {
+        const productIndex = allProducts.indexOf(product);
         const stockClass = product.stock <= 0 ? 'stock-out' : product.stock <= 5 ? 'stock-low' : 'stock-high';
         const stockText = product.stock <= 0 ? 'Agotado' : product.stock <= 5 ? `${product.stock} disponibles` : 'Disponible';
         const cardClass = product.stock <= 0 ? 'card out-of-stock' : 'card';
@@ -827,8 +924,8 @@ function renderProducts(products) {
         
         return `
             <div class="${cardClass}">
-                <div class="card-image" onclick="openGallery(${allProducts.indexOf(product)})">
-                    <img src="${product.image}" alt="${product.name}" loading="lazy">
+                <div class="card-image" onclick="openGallery(${productIndex})">
+                    <img src="${product.image}" alt="${product.name}" loading="lazy" onerror="this.src='/uploads/placeholder.jpg'">
                     ${product.discount > 0 ? `<div class="badge">-${product.discount}%</div>` : ''}
                     <div class="stock-badge ${stockClass}">${stockText}</div>
                     ${galleryIndicator}
@@ -848,19 +945,95 @@ function renderProducts(products) {
                 </div>
                 <div class="card-footer">
                     <button class="btn-comprar" ${product.stock <= 0 ? 'disabled' : ''} 
-                            onclick="${product.stock > 0 ? `openPurchaseModal(${allProducts.indexOf(product)})` : ''}">
-                        ${product.stock <= 0 ? '❌ Agotado' : '🛒 Comprar'}
+                            onclick="${product.stock > 0 ? `openPurchaseModal(${productIndex})` : ''}">
+                        ${product.stock <= 0 ? '⌚ Agotado' : '🛒 Comprar'}
                     </button>
                 </div>
             </div>
         `;
     }).join('');
+    
+    console.log('✅ Productos renderizados correctamente');
 }
+
+// Configurar event listeners
+function setupEventListeners() {
+    console.log('⚡ Configurando event listeners...');
+    
+    // Búsqueda
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (query === '') {
+                filteredProducts = [...allProducts];
+            } else {
+                filteredProducts = allProducts.filter(product => 
+                    product.name.toLowerCase().includes(query) ||
+                    (product.description && product.description.toLowerCase().includes(query)) ||
+                    (product.category && product.category.toLowerCase().includes(query))
+                );
+            }
+            renderProducts(filteredProducts);
+        });
+    }
+    
+    // Menu toggle para móvil
+    const menuToggle = document.getElementById('menuToggle');
+    const topBar = document.getElementById('topBar');
+    if (menuToggle && topBar) {
+        menuToggle.addEventListener('click', () => {
+            topBar.classList.toggle('show');
+        });
+    }
+    
+    // Cerrar modales con ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeGallery();
+            closePurchaseModal();
+        }
+    });
+}
+
+// ================================
+// FUNCIONES DE FILTRADO
+// ================================
+
+// Filtrar por categoría
+function filterByCategory(category) {
+    console.log(`🔍 Filtrando por categoría: ${category}`);
+    
+    // Actualizar botones activos
+    const buttons = document.querySelectorAll('.categories button');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Filtrar productos
+    if (category === 'all') {
+        filteredProducts = [...allProducts];
+    } else {
+        filteredProducts = allProducts.filter(product => 
+            product.category === category
+        );
+    }
+    
+    renderProducts(filteredProducts);
+}
+
+// ================================
+// FUNCIONES DE GALERÍA
+// ================================
 
 // Abrir galería de imágenes
 function openGallery(productIndex) {
     const product = allProducts[productIndex];
-    if (!product) return;
+    if (!product) {
+        console.error('❌ Producto no encontrado para galería');
+        return;
+    }
+    
+    console.log('🖼️ Abriendo galería para:', product.name);
     
     currentGalleryProduct = product;
     currentImageIndex = 0;
@@ -870,10 +1043,16 @@ function openGallery(productIndex) {
     const title = document.getElementById('galleryTitle');
     const counter = document.getElementById('galleryCounter');
     
+    if (!modal || !image || !title || !counter) {
+        console.error('❌ Elementos de galería no encontrados');
+        return;
+    }
+    
     // Usar el array de imágenes si existe, sino usar la imagen principal
     const images = product.images && product.images.length > 0 ? product.images : [product.image];
     
     image.src = images[0];
+    image.onerror = () => { image.src = '/uploads/placeholder.jpg'; };
     title.textContent = product.name;
     counter.textContent = `${currentImageIndex + 1} de ${images.length}`;
     
@@ -898,8 +1077,11 @@ function navigateGallery(direction) {
     const image = document.getElementById('galleryImage');
     const counter = document.getElementById('galleryCounter');
     
-    image.src = images[currentImageIndex];
-    counter.textContent = `${currentImageIndex + 1} de ${images.length}`;
+    if (image && counter) {
+        image.src = images[currentImageIndex];
+        image.onerror = () => { image.src = '/uploads/placeholder.jpg'; };
+        counter.textContent = `${currentImageIndex + 1} de ${images.length}`;
+    }
     
     updateGalleryNavigation();
 }
@@ -909,7 +1091,7 @@ function updateGalleryNavigation() {
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     
-    if (!currentGalleryProduct) return;
+    if (!currentGalleryProduct || !prevBtn || !nextBtn) return;
 
     const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
         ? currentGalleryProduct.images 
@@ -919,3 +1101,156 @@ function updateGalleryNavigation() {
     prevBtn.disabled = images.length <= 1;
     nextBtn.disabled = images.length <= 1;
 }
+
+// Cerrar galería
+function closeGallery() {
+    const modal = document.getElementById('galleryModal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+        currentGalleryProduct = null;
+        currentImageIndex = 0;
+    }
+}
+
+// ================================
+// FUNCIONES DE COMPRA
+// ================================
+
+// Abrir modal de compra
+function openPurchaseModal(productIndex) {
+    const product = allProducts[productIndex];
+    if (!product) {
+        console.error('❌ Producto no encontrado para compra');
+        return;
+    }
+    
+    console.log('🛒 Abriendo modal de compra para:', product.name);
+    
+    currentProduct = product;
+    currentQuantity = 1;
+    
+    const modal = document.getElementById('purchaseModal');
+    const name = document.getElementById('modalProductName');
+    const desc = document.getElementById('modalProductDesc');
+    const price = document.getElementById('modalProductPrice');
+    const quantityInput = document.getElementById('quantityInput');
+    
+    if (!modal || !name || !desc || !price || !quantityInput) {
+        console.error('❌ Elementos de modal de compra no encontrados');
+        return;
+    }
+    
+    name.textContent = product.name;
+    desc.textContent = product.description;
+    price.textContent = `S/. ${product.price.toFixed(2)}`;
+    quantityInput.value = currentQuantity;
+    
+    updateTotal();
+    updateQuantityButtons();
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+// Cambiar cantidad
+function changeQuantity(change) {
+    if (!currentProduct) return;
+    
+    const newQuantity = currentQuantity + change;
+    if (newQuantity >= 1 && newQuantity <= currentProduct.stock) {
+        currentQuantity = newQuantity;
+        const quantityInput = document.getElementById('quantityInput');
+        if (quantityInput) {
+            quantityInput.value = currentQuantity;
+        }
+        updateTotal();
+        updateQuantityButtons();
+    }
+}
+
+// Actualizar total
+function updateTotal() {
+    if (!currentProduct) return;
+    
+    const total = currentProduct.price * currentQuantity;
+    const totalAmount = document.getElementById('totalAmount');
+    if (totalAmount) {
+        totalAmount.textContent = `S/. ${total.toFixed(2)}`;
+    }
+}
+
+// Actualizar botones de cantidad
+function updateQuantityButtons() {
+    if (!currentProduct) return;
+    
+    const decreaseBtn = document.getElementById('decreaseBtn');
+    const increaseBtn = document.getElementById('increaseBtn');
+    
+    if (decreaseBtn) {
+        decreaseBtn.disabled = currentQuantity <= 1;
+    }
+    
+    if (increaseBtn) {
+        increaseBtn.disabled = currentQuantity >= currentProduct.stock;
+    }
+}
+
+// Confirmar compra
+function confirmPurchase() {
+    if (!currentProduct) return;
+    
+    const total = currentProduct.price * currentQuantity;
+    
+    // Crear mensaje para WhatsApp
+    const message = `🛒 *Nueva Orden - HernándezStore*\n\n` +
+                   `📦 *Producto:* ${currentProduct.name}\n` +
+                   `💰 *Precio unitario:* S/. ${currentProduct.price.toFixed(2)}\n` +
+                   `🔢 *Cantidad:* ${currentQuantity}\n` +
+                   `💵 *Total:* S/. ${total.toFixed(2)}\n\n` +
+                   `📝 *Descripción:* ${currentProduct.description}\n\n` +
+                   `✅ Confirmo mi pedido y acepto el pago contra entrega.`;
+    
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/51999999999?text=${encodedMessage}`;
+    
+    // Abrir WhatsApp
+    window.open(whatsappUrl, '_blank');
+    
+    // Cerrar modal
+    closePurchaseModal();
+    
+    // Mostrar mensaje de confirmación
+    alert('✅ ¡Pedido enviado!\n\nTe hemos redirigido a WhatsApp para confirmar tu compra. ¡Gracias por elegir HernándezStore! 🎉');
+}
+
+// Cerrar modal de compra
+function closePurchaseModal() {
+    const modal = document.getElementById('purchaseModal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+        currentProduct = null;
+        currentQuantity = 1;
+    }
+}
+
+// ================================
+// INICIALIZACIÓN
+// ================================
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM cargado, iniciando aplicación...');
+    loadProducts();
+});
+
+// Backup: inicializar si DOMContentLoaded ya pasó
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadProducts);
+} else {
+    console.log('🚀 DOM ya está listo, iniciando aplicación...');
+    loadProducts();
+}
+</script>
+</body>
+</html>
