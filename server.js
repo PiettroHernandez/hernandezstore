@@ -9,6 +9,16 @@ console.log('CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME || '❌ 
 console.log('CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY || '❌ No encontrada');
 console.log('CLOUDINARY_API_SECRET:', process.env.CLOUDINARY_API_SECRET || '❌ No encontrada');
 
+// RAILWAY DEBUG ESPECÍFICO
+console.log('🚂 RAILWAY DEBUG:', {
+  NODE_ENV: process.env.NODE_ENV,
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? 'PRESENTE ✅' : 'FALTANTE ❌',
+  CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER,
+  TIMESTAMP_ACTUAL: Math.round(Date.now() / 1000)
+});
+
 // =======================
 // 🔌 DEPENDENCIAS
 // =======================
@@ -22,7 +32,6 @@ const cors = require('cors');
 
 // Cloudinary (solo cargar si las variables existen)
 let cloudinary = null;
-let CloudinaryStorage = null;
 
 // =======================
 // 🔌 APP
@@ -118,7 +127,7 @@ function allQuery(sql, params = []) {
 }
 
 // =======================
-// 🔌 CLOUDINARY CONFIGURACIÓN
+// 🔌 CLOUDINARY CONFIGURACIÓN MEJORADA
 // =======================
 let useCloudinary = false;
 
@@ -126,21 +135,37 @@ let useCloudinary = false;
 console.log('🔍 Verificando configuración de Cloudinary...');
 if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
   try {
-    // Solo cargar Cloudinary si las variables están presentes
     cloudinary = require('cloudinary').v2;
-    const { CloudinaryStorage: CS } = require('multer-storage-cloudinary');
-    CloudinaryStorage = CS;
     
+    // Limpiar configuración previa
+    cloudinary.config({
+      cloud_name: undefined,
+      api_key: undefined,
+      api_secret: undefined
+    });
+    
+    // Configurar con parámetros específicos para Railway
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true,
+      shorten: true,
+      sign_url: true
+    });
+    
+    // Test inmediato de configuración
+    console.log('🔧 Cloudinary Config Test:', {
+      cloud_name: cloudinary.config().cloud_name,
+      api_key: cloudinary.config().api_key?.substring(0, 6) + '...',
+      api_secret: cloudinary.config().api_secret ? 'CONFIGURADO' : 'FALTANTE'
     });
     
     useCloudinary = true;
     console.log('✅ Cloudinary configurado correctamente');
     console.log('☁️ Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME);
     console.log('📁 Folder:', process.env.CLOUDINARY_FOLDER || 'hernandezstore');
+    
   } catch (error) {
     console.log('❌ Error configurando Cloudinary:', error.message);
     console.log('⚠️ Usando almacenamiento local como respaldo');
@@ -154,42 +179,33 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
   console.log('🔄 Usando almacenamiento local');
 }
 
-// Configuración de Multer
+// =======================
+// 🔌 CONFIGURACIÓN DE MULTER MEJORADA
+// =======================
 let upload;
 
-if (useCloudinary && cloudinary && CloudinaryStorage) {
-  // Usar Cloudinary
-  try {
-    const storage = new CloudinaryStorage({
-      cloudinary,
-      params: { 
-        folder: process.env.CLOUDINARY_FOLDER || 'hernandezstore', 
-        resource_type: 'image',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp']
+if (useCloudinary && cloudinary) {
+  // Usar memoria storage en lugar de CloudinaryStorage para mejor control
+  const memoryStorage = multer.memoryStorage();
+  
+  upload = multer({ 
+    storage: memoryStorage,
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB max
+      files: 10
+    },
+    fileFilter: (req, file, cb) => {
+      console.log('🔍 Verificando archivo:', file.originalname, 'tipo:', file.mimetype);
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Solo se permiten archivos de imagen'), false);
       }
-    });
-    
-    upload = multer({ 
-      storage,
-      limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB max
-      },
-      fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-          cb(null, true);
-        } else {
-          cb(new Error('Solo se permiten archivos de imagen'), false);
-        }
-      }
-    });
-    console.log('📸 Configurado para usar Cloudinary');
-  } catch (error) {
-    console.log('❌ Error configurando storage de Cloudinary:', error.message);
-    useCloudinary = false;
-  }
-}
-
-if (!useCloudinary) {
+    }
+  });
+  
+  console.log('📸 Configurado para usar Cloudinary con memory storage');
+} else {
   // Usar almacenamiento local
   try {
     const localStorage = multer.diskStorage({
@@ -608,15 +624,38 @@ app.get('/api/categories/stats', async (req, res) => {
 });
 
 // =======================
-// 🔌 API ENDPOINTS - UPLOADS
+// 🔌 MIDDLEWARE DE LOGS DETALLADOS PARA UPLOADS
 // =======================
 
-// Subir imágenes
+// Middleware para loggear todas las peticiones de upload
+app.use('/api/upload', (req, res, next) => {
+  console.log('\n🚀 === NUEVA PETICIÓN DE SUBIDA ===');
+  console.log('📅 Timestamp:', new Date().toISOString());
+  console.log('🌐 IP:', req.ip);
+  console.log('📝 User-Agent:', req.get('User-Agent'));
+  console.log('📦 Content-Type:', req.get('Content-Type'));
+  console.log('📊 Content-Length:', req.get('Content-Length'));
+  console.log('🔧 Sistema de upload:', useCloudinary ? 'Cloudinary ☁️' : 'Local 💾');
+  
+  // Log cuando termina la respuesta
+  const originalSend = res.send;
+  res.send = function(data) {
+    console.log('📤 Respuesta enviada:', res.statusCode);
+    console.log('🏁 === FIN DE PETICIÓN DE SUBIDA ===\n');
+    return originalSend.call(this, data);
+  };
+  
+  next();
+});
+
+// =======================
+// 🔌 API ENDPOINT MEJORADO PARA UPLOAD
+// =======================
+
 app.post('/api/upload', (req, res) => {
   console.log('📸 Iniciando subida de imágenes...');
   console.log('📸 Usando:', useCloudinary ? 'Cloudinary ☁️' : 'Local 💾');
   
-  // Verificar que upload esté configurado
   if (!upload) {
     console.error('❌ Upload no configurado');
     return res.status(500).json({ 
@@ -625,22 +664,12 @@ app.post('/api/upload', (req, res) => {
     });
   }
   
-  upload.array('images', 10)(req, res, (err) => {
+  upload.array('images', 10)(req, res, async (err) => {
     if (err) {
       console.error('❌ Error en multer:', err);
-      console.error('❌ Stack trace:', err.stack);
-      
-      let errorMessage = err.message;
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        errorMessage = 'El archivo es muy grande. Máximo 5MB por imagen.';
-      } else if (err.code === 'LIMIT_FILE_COUNT') {
-        errorMessage = 'Máximo 10 imágenes por vez.';
-      }
-      
       return res.status(500).json({ 
         success: false, 
-        message: errorMessage,
-        error: err.message
+        message: err.message 
       });
     }
     
@@ -652,31 +681,340 @@ app.post('/api/upload', (req, res) => {
       });
     }
     
-    console.log(`📸 ${req.files.length} archivo(s) procesado(s)`);
+    console.log(`📸 ${req.files.length} archivo(s) recibido(s)`);
     
     try {
-      // Generar URLs
-      const urls = req.files.map(file => {
-        if (useCloudinary) {
-          console.log('☁️ Imagen subida a Cloudinary:', file.path);
-          return file.path; // Cloudinary ya provee la URL completa
-        } else {
-          console.log('💾 Imagen guardada localmente:', `/uploads/${file.filename}`);
-          return `/uploads/${file.filename}`; // URL local
-        }
-      });
-      
-      console.log('✅ URLs generadas:', urls);
-      res.json({ success: true, urls });
+      if (useCloudinary) {
+        // Upload manual a Cloudinary con mejor control
+        const uploadPromises = req.files.map((file, index) => {
+          return new Promise((resolve, reject) => {
+            const timestamp = Math.round(Date.now() / 1000);
+            console.log(`☁️ Subiendo archivo ${index + 1} con timestamp: ${timestamp}`);
+            
+            cloudinary.uploader.upload_stream({
+              folder: process.env.CLOUDINARY_FOLDER || "hernandezstore",
+              public_id: `img_${timestamp}_${index}`,
+              resource_type: "image",
+              allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+              transformation: [
+                { quality: "auto:good" },
+                { fetch_format: "auto" }
+              ]
+            }, (error, result) => {
+              if (error) {
+                console.error(`❌ Error subiendo archivo ${index + 1}:`, error);
+                reject(error);
+              } else {
+                console.log(`✅ Archivo ${index + 1} subido:`, result.secure_url);
+                resolve(result.secure_url);
+              }
+            }).end(file.buffer);
+          });
+        });
+        
+        const urls = await Promise.all(uploadPromises);
+        console.log('✅ Todas las imágenes subidas a Cloudinary:', urls);
+        res.json({ success: true, urls });
+        
+      } else {
+        // Lógica local
+        const urls = req.files.map(file => `/uploads/${file.filename}`);
+        console.log('✅ URLs locales generadas:', urls);
+        res.json({ success: true, urls });
+      }
       
     } catch (error) {
-      console.error('❌ Error procesando URLs:', error);
+      console.error('❌ Error procesando uploads:', error);
       res.status(500).json({ 
         success: false, 
-        message: 'Error procesando las imágenes subidas',
+        message: 'Error subiendo imágenes',
         error: error.message
       });
     }
+  });
+});
+
+// =======================
+// 🔌 API ENDPOINTS - PRUEBAS Y DIAGNÓSTICO
+// =======================
+
+// Test completo de Cloudinary
+app.get('/api/test-cloudinary-connection', async (req, res) => {
+  try {
+    console.log('🧪 Test completo de Cloudinary...');
+    
+    if (!useCloudinary || !cloudinary) {
+      return res.json({
+        success: false,
+        message: 'Cloudinary no configurado',
+        debug: {
+          useCloudinary,
+          hasCloudinary: !!cloudinary,
+          envVars: {
+            cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
+            api_key: !!process.env.CLOUDINARY_API_KEY,
+            api_secret: !!process.env.CLOUDINARY_API_SECRET
+          }
+        }
+      });
+    }
+    
+    // Test 1: Ping básico
+    console.log('🏓 Test 1: Ping...');
+    const pingResult = await cloudinary.api.ping();
+    console.log('✅ Ping exitoso:', pingResult);
+    
+    // Test 2: Obtener uso
+    console.log('📊 Test 2: Usage...');
+    const usage = await cloudinary.api.usage();
+    console.log('✅ Usage obtenido:', usage.credits);
+    
+    // Test 3: Generar timestamp
+    const currentTimestamp = Math.round(Date.now() / 1000);
+    console.log('🕐 Test 3: Timestamp actual:', currentTimestamp);
+    
+    res.json({
+      success: true,
+      message: 'Cloudinary funcionando correctamente',
+      tests: {
+        ping: pingResult,
+        usage: {
+          credits: usage.credits,
+          last_updated: usage.last_updated
+        },
+        timestamp: currentTimestamp,
+        config: {
+          cloud_name: cloudinary.config().cloud_name,
+          folder: process.env.CLOUDINARY_FOLDER || 'hernandezstore'
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Test fallido:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error en test de Cloudinary',
+      error: {
+        message: error.message,
+        http_code: error.http_code,
+        api_error: error.error
+      }
+    });
+  }
+});
+
+// Ruta para probar la conexión con Cloudinary (legacy)
+app.get('/api/test-cloudinary', async (req, res) => {
+  try {
+    console.log('🧪 Probando conexión con Cloudinary...');
+    
+    if (!useCloudinary) {
+      return res.json({
+        success: false,
+        message: 'Cloudinary no está configurado - usando almacenamiento local',
+        config: {
+          useCloudinary: false,
+          hasCloudName: !!process.env.CLOUDINARY_CLOUD_NAME,
+          hasApiKey: !!process.env.CLOUDINARY_API_KEY,
+          hasApiSecret: !!process.env.CLOUDINARY_API_SECRET
+        }
+      });
+    }
+    
+    if (!cloudinary) {
+      return res.status(500).json({
+        success: false,
+        message: 'Cloudinary no está disponible',
+        error: 'Módulo cloudinary no cargado'
+      });
+    }
+    
+    // Test básico de conexión con Cloudinary
+    const result = await cloudinary.api.ping();
+    console.log('✅ Cloudinary responde:', result);
+    
+    // Obtener información de la cuenta
+    const usage = await cloudinary.api.usage();
+    console.log('📊 Uso de Cloudinary:', usage);
+    
+    res.json({
+      success: true,
+      message: 'Cloudinary conectado correctamente',
+      cloudinary_status: result,
+      usage: {
+        credits: usage.credits,
+        media_limits: usage.media_limits,
+        last_updated: usage.last_updated
+      },
+      config: {
+        cloud_name: cloudinary.config().cloud_name,
+        folder: process.env.CLOUDINARY_FOLDER || 'hernandezstore',
+        useCloudinary: useCloudinary
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error conectando a Cloudinary:', error);
+    console.error('❌ Stack trace:', error.stack);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error conectando a Cloudinary',
+      details: error.message,
+      error_code: error.error?.code || 'UNKNOWN',
+      http_code: error.error?.http_code || null
+    });
+  }
+});
+
+// Ruta para obtener información del sistema de uploads
+app.get('/api/upload-info', (req, res) => {
+  console.log('ℹ️ Obteniendo información del sistema de uploads');
+  
+  res.json({
+    success: true,
+    upload_system: {
+      using_cloudinary: useCloudinary,
+      cloudinary_available: !!cloudinary,
+      upload_configured: !!upload,
+      uploads_dir: uploadsDir,
+      uploads_dir_exists: fs.existsSync(uploadsDir)
+    },
+    environment: {
+      cloudinary_cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
+      cloudinary_api_key: !!process.env.CLOUDINARY_API_KEY,
+      cloudinary_api_secret: !!process.env.CLOUDINARY_API_SECRET,
+      cloudinary_folder: process.env.CLOUDINARY_FOLDER || 'hernandezstore'
+    },
+    limits: {
+      max_file_size: '5MB',
+      max_files_per_upload: 10,
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp']
+    }
+  });
+});
+
+// Ruta para probar la subida con un archivo de prueba
+app.post('/api/test-upload', (req, res) => {
+  console.log('🧪 Probando sistema de subida...');
+  
+  if (!upload) {
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Sistema de subida no configurado' 
+    });
+  }
+  
+  upload.array('test_images', 1)(req, res, async (err) => {
+    if (err) {
+      console.error('❌ Error en test de subida:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Error en el test de subida',
+        error: err.message,
+        error_code: err.code
+      });
+    }
+    
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se enviaron archivos para el test'
+      });
+    }
+    
+    const file = req.files[0];
+    console.log('✅ Test de subida exitoso:', file.filename || file.public_id);
+    
+    if (useCloudinary) {
+      // Test con Cloudinary
+      try {
+        const timestamp = Math.round(Date.now() / 1000);
+        const result = await new Promise((resolve, reject) => {
+          cloudinary.uploader.upload_stream({
+            folder: process.env.CLOUDINARY_FOLDER || "hernandezstore",
+            public_id: `test_${timestamp}`,
+            resource_type: "image"
+          }, (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }).end(file.buffer);
+        });
+        
+        res.json({
+          success: true,
+          message: 'Test de subida a Cloudinary exitoso',
+          file_info: {
+            original_name: file.originalname,
+            size: file.size,
+            mimetype: file.mimetype,
+            url: result.secure_url,
+            public_id: result.public_id,
+            storage: 'cloudinary'
+          }
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: 'Error en test de Cloudinary',
+          error: error.message
+        });
+      }
+    } else {
+      // Test local
+      const url = `/uploads/${file.filename}`;
+      res.json({
+        success: true,
+        message: 'Test de subida local exitoso',
+        file_info: {
+          original_name: file.originalname,
+          size: file.size,
+          mimetype: file.mimetype,
+          url: url,
+          storage: 'local'
+        }
+      });
+    }
+  });
+});
+
+// Ruta para obtener logs detallados del último error
+app.get('/api/debug-logs', (req, res) => {
+  console.log('🐛 Generando logs de debug...');
+  
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    server_status: 'running',
+    upload_system: {
+      using_cloudinary: useCloudinary,
+      cloudinary_module_loaded: !!cloudinary,
+      upload_middleware_configured: !!upload
+    },
+    environment_vars: {
+      has_cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
+      has_api_key: !!process.env.CLOUDINARY_API_KEY,
+      has_api_secret: !!process.env.CLOUDINARY_API_SECRET,
+      node_env: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || 4000
+    },
+    directories: {
+      uploads_dir: uploadsDir,
+      uploads_exists: fs.existsSync(uploadsDir),
+      current_working_dir: process.cwd()
+    },
+    cloudinary_config: cloudinary ? {
+      cloud_name: cloudinary.config().cloud_name,
+      api_key: cloudinary.config().api_key ? '✅ Configurado' : '❌ Faltante',
+      api_secret: cloudinary.config().api_secret ? '✅ Configurado' : '❌ Faltante'
+    } : 'No disponible'
+  };
+  
+  console.log('📋 Debug info generado:', debugInfo);
+  
+  res.json({
+    success: true,
+    debug_info: debugInfo
   });
 });
 
@@ -714,5 +1052,12 @@ app.listen(PORT, () => {
   console.log(`🌐 Tienda: http://localhost:${PORT}`);
   console.log(`⚙️ Admin: http://localhost:${PORT}/admin`);
   console.log(`📁 Uploads: ${useCloudinary ? 'Cloudinary ☁️' : 'Local 💾'}`);
+  console.log('=====================================');
+  console.log('🔧 Rutas de diagnóstico disponibles:');
+  console.log(`   📋 Debug: http://localhost:${PORT}/api/debug-logs`);
+  console.log(`   ☁️ Test Cloudinary: http://localhost:${PORT}/api/test-cloudinary-connection`);
+  console.log(`   🧪 Test Legacy: http://localhost:${PORT}/api/test-cloudinary`);
+  console.log(`   ℹ️ Upload Info: http://localhost:${PORT}/api/upload-info`);
+  console.log(`   🔬 Test Upload: http://localhost:${PORT}/api/test-upload`);
   console.log('=====================================');
 });
