@@ -20,9 +20,9 @@ const multer = require('multer');
 const fs = require('fs');
 const cors = require('cors');
 
-// Cloudinary
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// Cloudinary (solo cargar si las variables existen)
+let cloudinary = null;
+let CloudinaryStorage = null;
 
 // =======================
 // 🔌 APP
@@ -41,18 +41,6 @@ const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
   console.log('📁 Directorio uploads creado');
-}
-
-// Crear placeholder.jpg si no existe
-const placeholderPath = path.join(uploadsDir, 'placeholder.jpg');
-if (!fs.existsSync(placeholderPath)) {
-  try {
-    // Crear un archivo placeholder simple
-    fs.writeFileSync(placeholderPath, 'PLACEHOLDER - Replace with actual image');
-    console.log('✅ Placeholder creado en:', placeholderPath);
-  } catch (err) {
-    console.log('⚠️ No se pudo crear placeholder:', err.message);
-  }
 }
 
 // Static files
@@ -134,15 +122,21 @@ function allQuery(sql, params = []) {
 // =======================
 let useCloudinary = false;
 
-// Verificar si Cloudinary está configurado (DESPUÉS de cargar dotenv)
+// Verificar si Cloudinary está configurado
 console.log('🔍 Verificando configuración de Cloudinary...');
 if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
   try {
+    // Solo cargar Cloudinary si las variables están presentes
+    cloudinary = require('cloudinary').v2;
+    const { CloudinaryStorage: CS } = require('multer-storage-cloudinary');
+    CloudinaryStorage = CS;
+    
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET
     });
+    
     useCloudinary = true;
     console.log('✅ Cloudinary configurado correctamente');
     console.log('☁️ Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME);
@@ -160,60 +154,85 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
   console.log('🔄 Usando almacenamiento local');
 }
 
-// Configuración de Multer (local y Cloudinary)
+// Configuración de Multer
 let upload;
 
-if (useCloudinary) {
+if (useCloudinary && cloudinary && CloudinaryStorage) {
   // Usar Cloudinary
-  const storage = new CloudinaryStorage({
-    cloudinary,
-    params: { 
-      folder: process.env.CLOUDINARY_FOLDER || 'hernandezstore', 
-      resource_type: 'image',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp']
-    }
-  });
-  upload = multer({ 
-    storage,
-    limits: {
-      fileSize: 5 * 1024 * 1024 // 5MB max
-    },
-    fileFilter: (req, file, cb) => {
-      if (file.mimetype.startsWith('image/')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Solo se permiten archivos de imagen'), false);
+  try {
+    const storage = new CloudinaryStorage({
+      cloudinary,
+      params: { 
+        folder: process.env.CLOUDINARY_FOLDER || 'hernandezstore', 
+        resource_type: 'image',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp']
       }
-    }
-  });
-  console.log('📸 Configurado para usar Cloudinary');
-} else {
+    });
+    
+    upload = multer({ 
+      storage,
+      limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB max
+      },
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+          cb(null, true);
+        } else {
+          cb(new Error('Solo se permiten archivos de imagen'), false);
+        }
+      }
+    });
+    console.log('📸 Configurado para usar Cloudinary');
+  } catch (error) {
+    console.log('❌ Error configurando storage de Cloudinary:', error.message);
+    useCloudinary = false;
+  }
+}
+
+if (!useCloudinary) {
   // Usar almacenamiento local
-  const localStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, uploadsDir);
-    },
-    filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const ext = path.extname(file.originalname);
-      cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-    }
-  });
-  
-  upload = multer({ 
-    storage: localStorage,
-    limits: {
-      fileSize: 5 * 1024 * 1024 // 5MB max
-    },
-    fileFilter: (req, file, cb) => {
-      if (file.mimetype.startsWith('image/')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Solo se permiten archivos de imagen'), false);
+  try {
+    const localStorage = multer.diskStorage({
+      destination: (req, file, cb) => {
+        // Verificar que el directorio existe
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        cb(null, uploadsDir);
+      },
+      filename: (req, file, cb) => {
+        try {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+          const ext = path.extname(file.originalname);
+          const name = file.fieldname + '-' + uniqueSuffix + ext;
+          console.log('📁 Guardando archivo como:', name);
+          cb(null, name);
+        } catch (error) {
+          console.error('❌ Error generando nombre de archivo:', error);
+          cb(error);
+        }
       }
-    }
-  });
-  console.log('📸 Configurado para almacenamiento local');
+    });
+    
+    upload = multer({ 
+      storage: localStorage,
+      limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB max
+      },
+      fileFilter: (req, file, cb) => {
+        console.log('🔍 Verificando archivo:', file.originalname, 'tipo:', file.mimetype);
+        if (file.mimetype.startsWith('image/')) {
+          cb(null, true);
+        } else {
+          cb(new Error('Solo se permiten archivos de imagen'), false);
+        }
+      }
+    });
+    console.log('📸 Configurado para almacenamiento local');
+  } catch (error) {
+    console.error('❌ Error configurando almacenamiento local:', error);
+    throw error;
+  }
 }
 
 // =======================
@@ -594,18 +613,39 @@ app.get('/api/categories/stats', async (req, res) => {
 
 // Subir imágenes
 app.post('/api/upload', (req, res) => {
-  console.log('📸 Subiendo imágenes...');
+  console.log('📸 Iniciando subida de imágenes...');
+  console.log('📸 Usando:', useCloudinary ? 'Cloudinary ☁️' : 'Local 💾');
+  
+  // Verificar que upload esté configurado
+  if (!upload) {
+    console.error('❌ Upload no configurado');
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Sistema de subida no configurado correctamente' 
+    });
+  }
   
   upload.array('images', 10)(req, res, (err) => {
     if (err) {
-      console.error('❌ Error subiendo imágenes:', err);
+      console.error('❌ Error en multer:', err);
+      console.error('❌ Stack trace:', err.stack);
+      
+      let errorMessage = err.message;
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        errorMessage = 'El archivo es muy grande. Máximo 5MB por imagen.';
+      } else if (err.code === 'LIMIT_FILE_COUNT') {
+        errorMessage = 'Máximo 10 imágenes por vez.';
+      }
+      
       return res.status(500).json({ 
         success: false, 
-        message: err.message 
+        message: errorMessage,
+        error: err.message
       });
     }
     
     if (!req.files || req.files.length === 0) {
+      console.log('⚠️ No se recibieron archivos');
       return res.status(400).json({ 
         success: false, 
         message: 'No se recibieron archivos' 
@@ -614,19 +654,29 @@ app.post('/api/upload', (req, res) => {
     
     console.log(`📸 ${req.files.length} archivo(s) procesado(s)`);
     
-    // Generar URLs
-    const urls = req.files.map(file => {
-      if (useCloudinary) {
-        console.log('☁️ Imagen subida a Cloudinary:', file.path);
-        return file.path; // Cloudinary ya provee la URL completa
-      } else {
-        console.log('💾 Imagen guardada localmente:', `/uploads/${file.filename}`);
-        return `/uploads/${file.filename}`; // URL local
-      }
-    });
-    
-    console.log('✅ URLs generadas:', urls);
-    res.json({ success: true, urls });
+    try {
+      // Generar URLs
+      const urls = req.files.map(file => {
+        if (useCloudinary) {
+          console.log('☁️ Imagen subida a Cloudinary:', file.path);
+          return file.path; // Cloudinary ya provee la URL completa
+        } else {
+          console.log('💾 Imagen guardada localmente:', `/uploads/${file.filename}`);
+          return `/uploads/${file.filename}`; // URL local
+        }
+      });
+      
+      console.log('✅ URLs generadas:', urls);
+      res.json({ success: true, urls });
+      
+    } catch (error) {
+      console.error('❌ Error procesando URLs:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error procesando las imágenes subidas',
+        error: error.message
+      });
+    }
   });
 });
 
