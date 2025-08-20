@@ -27,6 +27,7 @@
         flex-direction:column; 
         min-height:100vh; 
         line-height:1.6;
+        overflow-x: hidden;
     }
     
     header { 
@@ -216,6 +217,11 @@
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         animation: slideUp 0.3s ease;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        touch-action: none;
     }
     
     .gallery-nav {
@@ -298,6 +304,59 @@
         color: var(--muted);
         font-size: 0.9rem;
         margin-top: 0.5rem;
+    }
+    
+    /* Indicadores móviles */
+    .mobile-gallery-indicators {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        z-index: 20;
+    }
+    
+    .gallery-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.4);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+    }
+    
+    .gallery-dot.active {
+        background: var(--accent);
+        border-color: rgba(255,255,255,0.3);
+        transform: scale(1.2);
+    }
+    
+    .gallery-dot:hover {
+        background: rgba(255,255,255,0.6);
+    }
+    
+    /* Instrucciones de swipe para móvil */
+    .swipe-hint {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        opacity: 0;
+        animation: fadeInOut 3s ease-in-out;
+        pointer-events: none;
+        z-index: 15;
+    }
+    
+    @keyframes fadeInOut {
+        0%, 100% { opacity: 0; }
+        20%, 80% { opacity: 1; }
     }
     
     .badge { 
@@ -680,6 +739,34 @@
         .menu-toggle {
             display: block;
         }
+        
+        /* Mejorar indicadores en móvil */
+        .gallery-dot {
+            width: 14px;
+            height: 14px;
+            margin: 0 2px;
+        }
+        
+        .swipe-hint {
+            font-size: 0.9rem;
+            padding: 0.7rem 1.2rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .gallery-nav.prev {
+            left: -40px;
+        }
+        
+        .gallery-nav.next {
+            right: -40px;
+        }
+        
+        .gallery-nav {
+            width: 35px;
+            height: 35px;
+            font-size: 1rem;
+        }
     }
 </style>
 </head>
@@ -713,6 +800,7 @@
         <button class="gallery-nav prev" id="prevBtn" onclick="navigateGallery(-1)">‹</button>
         <img class="gallery-image" id="galleryImage" src="" alt="">
         <button class="gallery-nav next" id="nextBtn" onclick="navigateGallery(1)">›</button>
+        <div class="swipe-hint" id="swipeHint">👆 Desliza para cambiar imagen</div>
         <div class="gallery-info">
             <h4 id="galleryTitle"></h4>
             <div class="gallery-counter" id="galleryCounter"></div>
@@ -768,11 +856,33 @@ let currentQuantity = 1;
 let currentGalleryProduct = null;
 let currentImageIndex = 0;
 
+// Variables para gestos táctiles
+let touchStartX = 0;
+let touchEndX = 0;
+let touchStartY = 0;
+let touchEndY = 0;
+let isGalleryOpen = false;
+let isSwiping = false;
+let swipeHintShown = false;
+
+// ================================
+// FUNCIONES DE DETECCIÓN MÓVIL
+// ================================
+
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           window.innerWidth <= 768;
+}
+
+function isTouchDevice() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
 // ================================
 // FUNCIONES PRINCIPALES
 // ================================
 
-// Cargar productos desde la API
+// Cargar productos desde tu API original
 async function loadProducts(){
     console.log('🔄 Iniciando carga de productos...');
     
@@ -862,12 +972,6 @@ async function loadProducts(){
                 <div class="error-state">
                     <h3>Error al cargar productos</h3>
                     <p>Error: ${err.message}</p>
-                    <p>Por favor, verifica:</p>
-                    <ul style="text-align: left; max-width: 400px; margin: 0 auto;">
-                        <li>Que el servidor esté funcionando</li>
-                        <li>Que la URL de la API sea correcta</li>
-                        <li>Que tengas productos en la base de datos</li>
-                    </ul>
                     <button onclick="loadProducts()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: var(--accent); color: #000; border: none; border-radius: 5px; cursor: pointer;">
                         🔄 Reintentar
                     </button>
@@ -946,7 +1050,7 @@ function renderProducts(products) {
                 <div class="card-footer">
                     <button class="btn-comprar" ${product.stock <= 0 ? 'disabled' : ''} 
                             onclick="${product.stock > 0 ? `openPurchaseModal(${productIndex})` : ''}">
-                        ${product.stock <= 0 ? '⌚ Agotado' : '🛒 Comprar'}
+                        ${product.stock <= 0 ? '⏳ Agotado' : '🛒 Comprar'}
                     </button>
                 </div>
             </div>
@@ -956,7 +1060,321 @@ function renderProducts(products) {
     console.log('✅ Productos renderizados correctamente');
 }
 
-// Configurar event listeners
+// ================================
+// FUNCIONALIDAD TÁCTIL MÓVIL PARA GALERÍA
+// ================================
+
+function setupMobileGallery() {
+    const galleryModal = document.getElementById('galleryModal');
+    const galleryImage = document.getElementById('galleryImage');
+    
+    if (!galleryModal || !galleryImage) return;
+    
+    // Remover eventos anteriores para evitar duplicados
+    galleryModal.removeEventListener('touchstart', handleTouchStart);
+    galleryModal.removeEventListener('touchmove', handleTouchMove);
+    galleryModal.removeEventListener('touchend', handleTouchEnd);
+    
+    // Agregar eventos táctiles
+    galleryModal.addEventListener('touchstart', handleTouchStart, { passive: true });
+    galleryModal.addEventListener('touchmove', handleTouchMove, { passive: false });
+    galleryModal.addEventListener('touchend', handleTouchEnd, { passive: true });
+    
+    console.log('📱 Eventos táctiles configurados para galería');
+}
+
+function handleTouchStart(e) {
+    if (!isGalleryOpen) return;
+    
+    const touch = e.changedTouches[0];
+    touchStartX = touch.screenX;
+    touchStartY = touch.screenY;
+    isSwiping = false;
+    
+    console.log('👆 Touch start:', { x: touchStartX, y: touchStartY });
+}
+
+function handleTouchMove(e) {
+    if (!isGalleryOpen) return;
+    
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.screenX - touchStartX);
+    const deltaY = Math.abs(touch.screenY - touchStartY);
+    
+    // Determinar si es un swipe horizontal
+    if (deltaX > deltaY && deltaX > 10) {
+        isSwiping = true;
+        e.preventDefault(); // Prevenir scroll solo si es swipe horizontal
+    }
+}
+
+function handleTouchEnd(e) {
+    if (!isGalleryOpen) return;
+    
+    const touch = e.changedTouches[0];
+    touchEndX = touch.screenX;
+    touchEndY = touch.screenY;
+    
+    console.log('👆 Touch end:', { x: touchEndX, y: touchEndY });
+    
+    if (isSwiping) {
+        handleSwipe();
+    }
+    
+    isSwiping = false;
+}
+
+function handleSwipe() {
+    const swipeDistance = touchStartX - touchEndX;
+    const minSwipeDistance = 50; // Mínimo 50px para activar swipe
+    
+    console.log('👉 Swipe detectado, distancia:', swipeDistance);
+    
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+        if (swipeDistance > 0) {
+            // Swipe izquierda = siguiente imagen
+            console.log('👈 Swipe izquierda - Siguiente imagen');
+            navigateGallery(1);
+        } else {
+            // Swipe derecha = imagen anterior
+            console.log('👉 Swipe derecha - Imagen anterior');
+            navigateGallery(-1);
+        }
+        
+        // Ocultar hint después del primer swipe
+        hideSwipeHint();
+    }
+}
+
+function showSwipeHint() {
+    if (!isMobile() || !isTouchDevice() || swipeHintShown) return;
+    
+    const hint = document.getElementById('swipeHint');
+    if (hint && currentGalleryProduct && currentGalleryProduct.images && currentGalleryProduct.images.length > 1) {
+        hint.style.animation = 'fadeInOut 3s ease-in-out';
+        swipeHintShown = true;
+        
+        // Ocultar después de 3 segundos
+        setTimeout(() => {
+            hideSwipeHint();
+        }, 3000);
+    }
+}
+
+function hideSwipeHint() {
+    const hint = document.getElementById('swipeHint');
+    if (hint) {
+        hint.style.animation = 'none';
+        hint.style.opacity = '0';
+    }
+}
+
+// ================================
+// FUNCIONES DE GALERÍA MEJORADAS
+// ================================
+
+function openGallery(productIndex) {
+    const product = allProducts[productIndex];
+    if (!product) {
+        console.error('❌ Producto no encontrado para galería');
+        return;
+    }
+    
+    console.log('🖼️ Abriendo galería para:', product.name);
+    
+    currentGalleryProduct = product;
+    currentImageIndex = 0;
+    isGalleryOpen = true;
+    swipeHintShown = false;
+    
+    const modal = document.getElementById('galleryModal');
+    const image = document.getElementById('galleryImage');
+    const title = document.getElementById('galleryTitle');
+    const counter = document.getElementById('galleryCounter');
+    
+    if (!modal || !image || !title || !counter) {
+        console.error('❌ Elementos de galería no encontrados');
+        return;
+    }
+    
+    // Usar el array de imágenes si existe, sino usar la imagen principal
+    const images = product.images && product.images.length > 0 ? product.images : [product.image];
+    
+    image.src = images[0];
+    image.onerror = () => { 
+        image.src = '/uploads/placeholder.jpg';
+    };
+    title.textContent = product.name;
+    
+    updateGalleryUI();
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    
+    // Configurar funcionalidad móvil
+    if (isMobile() && isTouchDevice()) {
+        setupMobileGallery();
+        addMobileGalleryIndicators();
+        
+        // Mostrar hint de swipe después de un momento
+        setTimeout(() => {
+            showSwipeHint();
+        }, 1000);
+    }
+}
+
+function navigateGallery(direction) {
+    if (!currentGalleryProduct) return;
+    
+    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
+        ? currentGalleryProduct.images 
+        : [currentGalleryProduct.image];
+    
+    // No hacer nada si solo hay una imagen
+    if (images.length <= 1) return;
+    
+    currentImageIndex += direction;
+    
+    if (currentImageIndex < 0) currentImageIndex = images.length - 1;
+    if (currentImageIndex >= images.length) currentImageIndex = 0;
+    
+    const image = document.getElementById('galleryImage');
+    if (image) {
+        image.src = images[currentImageIndex];
+        image.onerror = () => { 
+            image.src = '/uploads/placeholder.jpg';
+        };
+    }
+    
+    updateGalleryUI();
+}
+
+function updateGalleryUI() {
+    if (!currentGalleryProduct) return;
+    
+    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
+        ? currentGalleryProduct.images 
+        : [currentGalleryProduct.image];
+    
+    const counter = document.getElementById('galleryCounter');
+    if (counter) {
+        counter.textContent = `${currentImageIndex + 1} de ${images.length}`;
+    }
+    
+    updateGalleryNavigation();
+    updateMobileIndicators();
+}
+
+function updateGalleryNavigation() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    
+    if (!currentGalleryProduct || !prevBtn || !nextBtn) return;
+
+    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
+        ? currentGalleryProduct.images 
+        : [currentGalleryProduct.image];
+
+    // Si hay más de 1 imagen, los botones quedan activos
+    prevBtn.disabled = images.length <= 1;
+    nextBtn.disabled = images.length <= 1;
+    
+    // Ocultar botones en móvil si solo hay una imagen
+    if (isMobile()) {
+        prevBtn.style.display = images.length <= 1 ? 'none' : 'flex';
+        nextBtn.style.display = images.length <= 1 ? 'none' : 'flex';
+    }
+}
+
+function addMobileGalleryIndicators() {
+    if (!currentGalleryProduct) return;
+    
+    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
+        ? currentGalleryProduct.images 
+        : [currentGalleryProduct.image];
+    
+    // Solo mostrar indicadores si hay más de 1 imagen
+    if (images.length <= 1) return;
+    
+    // Remover indicadores existentes
+    const existingIndicators = document.querySelector('.mobile-gallery-indicators');
+    if (existingIndicators) {
+        existingIndicators.remove();
+    }
+    
+    // Crear contenedor de indicadores
+    const indicatorsContainer = document.createElement('div');
+    indicatorsContainer.className = 'mobile-gallery-indicators';
+    
+    // Crear indicadores
+    for (let i = 0; i < images.length; i++) {
+        const dot = document.createElement('span');
+        dot.className = `gallery-dot ${i === currentImageIndex ? 'active' : ''}`;
+        dot.onclick = () => goToImage(i);
+        indicatorsContainer.appendChild(dot);
+    }
+    
+    // Agregar al contenedor de galería
+    const galleryContainer = document.querySelector('.gallery-container');
+    if (galleryContainer) {
+        galleryContainer.appendChild(indicatorsContainer);
+    }
+}
+
+function goToImage(index) {
+    if (!currentGalleryProduct) return;
+    
+    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
+        ? currentGalleryProduct.images 
+        : [currentGalleryProduct.image];
+    
+    if (index >= 0 && index < images.length) {
+        currentImageIndex = index;
+        
+        const image = document.getElementById('galleryImage');
+        if (image) {
+            image.src = images[currentImageIndex];
+            image.onerror = () => { 
+                image.src = '/uploads/placeholder.jpg';
+            };
+        }
+        
+        updateGalleryUI();
+        hideSwipeHint(); // Ocultar hint al usar indicadores
+    }
+}
+
+function updateMobileIndicators() {
+    const dots = document.querySelectorAll('.gallery-dot');
+    dots.forEach((dot, index) => {
+        dot.classList.toggle('active', index === currentImageIndex);
+    });
+}
+
+function closeGallery() {
+    const modal = document.getElementById('galleryModal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+        currentGalleryProduct = null;
+        currentImageIndex = 0;
+        isGalleryOpen = false;
+        swipeHintShown = false;
+        
+        // Remover indicadores móviles
+        const indicators = document.querySelector('.mobile-gallery-indicators');
+        if (indicators) {
+            indicators.remove();
+        }
+        
+        // Ocultar hint
+        hideSwipeHint();
+    }
+}
+
+// ================================
+// CONFIGURAR EVENT LISTENERS
+// ================================
+
 function setupEventListeners() {
     console.log('⚡ Configurando event listeners...');
     
@@ -994,13 +1412,25 @@ function setupEventListeners() {
             closePurchaseModal();
         }
     });
+    
+    // Navegación con teclado en galería
+    document.addEventListener('keydown', (e) => {
+        if (isGalleryOpen) {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                navigateGallery(-1);
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                navigateGallery(1);
+            }
+        }
+    });
 }
 
 // ================================
 // FUNCIONES DE FILTRADO
 // ================================
 
-// Filtrar por categoría
 function filterByCategory(category) {
     console.log(`🔍 Filtrando por categoría: ${category}`);
     
@@ -1022,102 +1452,9 @@ function filterByCategory(category) {
 }
 
 // ================================
-// FUNCIONES DE GALERÍA
-// ================================
-
-// Abrir galería de imágenes
-function openGallery(productIndex) {
-    const product = allProducts[productIndex];
-    if (!product) {
-        console.error('❌ Producto no encontrado para galería');
-        return;
-    }
-    
-    console.log('🖼️ Abriendo galería para:', product.name);
-    
-    currentGalleryProduct = product;
-    currentImageIndex = 0;
-    
-    const modal = document.getElementById('galleryModal');
-    const image = document.getElementById('galleryImage');
-    const title = document.getElementById('galleryTitle');
-    const counter = document.getElementById('galleryCounter');
-    
-    if (!modal || !image || !title || !counter) {
-        console.error('❌ Elementos de galería no encontrados');
-        return;
-    }
-    
-    // Usar el array de imágenes si existe, sino usar la imagen principal
-    const images = product.images && product.images.length > 0 ? product.images : [product.image];
-    
-    image.src = images[0];
-    image.onerror = () => { image.src = '/uploads/placeholder.jpg'; };
-    title.textContent = product.name;
-    counter.textContent = `${currentImageIndex + 1} de ${images.length}`;
-    
-    updateGalleryNavigation();
-    modal.classList.add('show');
-    document.body.style.overflow = 'hidden';
-}
-
-// Navegar en la galería
-function navigateGallery(direction) {
-    if (!currentGalleryProduct) return;
-    
-    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
-        ? currentGalleryProduct.images 
-        : [currentGalleryProduct.image];
-    
-    currentImageIndex += direction;
-    
-    if (currentImageIndex < 0) currentImageIndex = images.length - 1;
-    if (currentImageIndex >= images.length) currentImageIndex = 0;
-    
-    const image = document.getElementById('galleryImage');
-    const counter = document.getElementById('galleryCounter');
-    
-    if (image && counter) {
-        image.src = images[currentImageIndex];
-        image.onerror = () => { image.src = '/uploads/placeholder.jpg'; };
-        counter.textContent = `${currentImageIndex + 1} de ${images.length}`;
-    }
-    
-    updateGalleryNavigation();
-}
-
-// Actualizar botones de navegación
-function updateGalleryNavigation() {
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    
-    if (!currentGalleryProduct || !prevBtn || !nextBtn) return;
-
-    const images = currentGalleryProduct.images && currentGalleryProduct.images.length > 0 
-        ? currentGalleryProduct.images 
-        : [currentGalleryProduct.image];
-
-    // Si hay más de 1 imagen, los botones quedan activos
-    prevBtn.disabled = images.length <= 1;
-    nextBtn.disabled = images.length <= 1;
-}
-
-// Cerrar galería
-function closeGallery() {
-    const modal = document.getElementById('galleryModal');
-    if (modal) {
-        modal.classList.remove('show');
-        document.body.style.overflow = '';
-        currentGalleryProduct = null;
-        currentImageIndex = 0;
-    }
-}
-
-// ================================
 // FUNCIONES DE COMPRA
 // ================================
 
-// Abrir modal de compra
 function openPurchaseModal(productIndex) {
     const product = allProducts[productIndex];
     if (!product) {
@@ -1152,7 +1489,6 @@ function openPurchaseModal(productIndex) {
     document.body.style.overflow = 'hidden';
 }
 
-// Cambiar cantidad
 function changeQuantity(change) {
     if (!currentProduct) return;
     
@@ -1168,7 +1504,6 @@ function changeQuantity(change) {
     }
 }
 
-// Actualizar total
 function updateTotal() {
     if (!currentProduct) return;
     
@@ -1179,7 +1514,6 @@ function updateTotal() {
     }
 }
 
-// Actualizar botones de cantidad
 function updateQuantityButtons() {
     if (!currentProduct) return;
     
@@ -1195,7 +1529,6 @@ function updateQuantityButtons() {
     }
 }
 
-// Confirmar compra
 function confirmPurchase() {
     if (!currentProduct) return;
     
@@ -1223,7 +1556,6 @@ function confirmPurchase() {
     alert('✅ ¡Pedido enviado!\n\nTe hemos redirigido a WhatsApp para confirmar tu compra. ¡Gracias por elegir HernándezStore! 🎉');
 }
 
-// Cerrar modal de compra
 function closePurchaseModal() {
     const modal = document.getElementById('purchaseModal');
     if (modal) {
@@ -1241,6 +1573,18 @@ function closePurchaseModal() {
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM cargado, iniciando aplicación...');
+    
+    // Detectar capacidades del dispositivo
+    if (isMobile()) {
+        console.log('📱 Dispositivo móvil detectado');
+        document.body.classList.add('mobile-device');
+    }
+    
+    if (isTouchDevice()) {
+        console.log('👆 Dispositivo táctil detectado');
+        document.body.classList.add('touch-device');
+    }
+    
     loadProducts();
 });
 
