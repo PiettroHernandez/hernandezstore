@@ -691,6 +691,37 @@
     
     /* Responsive para galería */
     @media (max-width: 768px) {
+    /* Estilos para el enlace de Instagram */
+.social-links {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #333;
+}
+
+.instagram-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    background: rgba(245, 197, 66, 0.1);
+}
+
+.instagram-link:hover {
+    color: #fff;
+    background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(245, 197, 66, 0.3);
+}
+
+@media (max-width: 768px) {
+    .instagram-link {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.8rem;
+    }
+}
         .gallery-nav.prev {
             left: -50px;
         }
@@ -840,6 +871,12 @@
     <strong>HernándezStore</strong><br>
     💖 Tu confianza es nuestra prioridad 💖<br>
     💵 Pagos contra entrega (📱 Yape | 🤳 Plin | 🏦 Transferencia)
+    <!-- Link de Instagram -->
+    <div class="social-links" style="margin-top: 1rem;">
+        <a href="https://www.instagram.com/hernandez_store01/" target="_blank" class="instagram-link">
+            📷 Síguenos en Instagram @hernandez_store01
+        </a>
+    </div>
 </footer>
 
 <script>
