@@ -1048,16 +1048,19 @@ app.get('/uploads/placeholder.jpg', (req, res) => {
 // 🚀 INICIAR SERVIDOR
 // =======================
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-  console.log(`🌐 Tienda: http://localhost:${PORT}`);
-  console.log(`⚙️ Admin: http://localhost:${PORT}/admin`);
-  console.log(`📁 Uploads: ${useCloudinary ? 'Cloudinary ☁️' : 'Local 💾'}`);
-  console.log('=====================================');
-  console.log('🔧 Rutas de diagnóstico disponibles:');
-  console.log(`   📋 Debug: http://localhost:${PORT}/api/debug-logs`);
-  console.log(`   ☁️ Test Cloudinary: http://localhost:${PORT}/api/test-cloudinary-connection`);
-  console.log(`   🧪 Test Legacy: http://localhost:${PORT}/api/test-cloudinary`);
-  console.log(`   ℹ️ Upload Info: http://localhost:${PORT}/api/upload-info`);
-  console.log(`   🔬 Test Upload: http://localhost:${PORT}/api/test-upload`);
-  console.log('=====================================');
+    console.log(`🌐 Servidor corriendo en puerto ${PORT}`);
+    console.log(`🛒 Tienda: http://localhost:${PORT}`);
+    console.log(`⚙️ Admin: http://localhost:${PORT}/admin`);
+    console.log(`📊 Upload Info: ${user}:${cloudinay_connection_string}-cloudinay:${'Local 🏠'}:`);
+    console.log("=================");
+    console.log(`🔧 Rutas de diagnóstico disponibles:`);
+    console.log(`🐛 Debug: http://localhost:${PORT}/api/debug-logs`);
+    console.log(`💚 Test Cloudinary: http://localhost:${PORT}/api/test-cloudinary-connection`);
+    console.log(`🧪 Test Legacy: http://localhost:${PORT}/api/test-cloudinary`);
+    console.log(`🆙 Upload Info: http://localhost:${PORT}/api/upload-info`);
+    console.log(`🔬 Test Upload: http://localhost:${PORT}/api/test-upload`);
+    console.log("=================");
 });
+
+// IMPORTANTE: Para que funcione en Vercel
+module.exports = app;
