@@ -8,14 +8,18 @@ console.log('🔍 DEBUG - Estado de variables:');
 console.log('CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME || '❌ No encontrada');
 console.log('CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY || '❌ No encontrada');
 console.log('CLOUDINARY_API_SECRET:', process.env.CLOUDINARY_API_SECRET || '❌ No encontrada');
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ Configurada' : '❌ No encontrada');
+console.log('SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? '✅ Configurada' : '❌ No encontrada');
 
-// RAILWAY DEBUG ESPECÍFICO
-console.log('🚂 RAILWAY DEBUG:', {
+// RAILWAY/VERCEL DEBUG ESPECÍFICO
+console.log('🚂 DATABASE DEBUG:', {
   NODE_ENV: process.env.NODE_ENV,
   CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
   CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? 'PRESENTE ✅' : 'FALTANTE ❌',
   CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER,
+  SUPABASE_URL: process.env.SUPABASE_URL ? 'CONFIGURADA ✅' : 'FALTANTE ❌',
+  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? 'CONFIGURADA ✅' : 'FALTANTE ❌',
   TIMESTAMP_ACTUAL: Math.round(Date.now() / 1000)
 });
 
@@ -24,7 +28,7 @@ console.log('🚂 RAILWAY DEBUG:', {
 // =======================
 const express = require('express');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
+const { createClient } = require('@supabase/supabase-js');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const fs = require('fs');
@@ -61,36 +65,54 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
 // =======================
-// 🔌 BD SQLITE
+// 🔌 BD SUPABASE
 // =======================
-const dbPath = path.join(__dirname, 'tienda.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) console.error('❌ Error conectando a SQLite:', err.message);
-  else console.log('✅ Conectado a SQLite');
-});
+let supabase = null;
 
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    shortDesc TEXT,
-    price REAL,
-    category TEXT,
-    discount INTEGER DEFAULT 0,
-    stock INTEGER DEFAULT 0,
-    images TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  db.run(`CREATE TABLE IF NOT EXISTS categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    label TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  
-  // Insertar categorías por defecto si no existen
-  db.get("SELECT COUNT(*) as count FROM categories", (err, row) => {
-    if (!err && row.count === 0) {
+try {
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY
+  );
+  console.log('✅ Cliente Supabase inicializado');
+} catch (error) {
+  console.error('❌ Error inicializando Supabase:', error.message);
+}
+
+// Test de conexión
+const testConnection = async () => {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('products').select('id').limit(1);
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
+    console.log('✅ Conectado a Supabase correctamente');
+  } catch (err) {
+    console.error('❌ Error conectando a Supabase:', err.message);
+  }
+};
+
+// Estado de inicialización de la base de datos
+let dbInitialized = false;
+
+// Crear tablas y datos iniciales
+const initDB = async () => {
+  if (dbInitialized || !supabase) return;
+  try {
+    console.log('🏗️ Verificando tablas...');
+    
+    // Intentar crear categorías por defecto si no existen
+    const { data: categories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('*')
+      .limit(1);
+    
+    if (categoriesError && categoriesError.code === 'PGRST116') {
+      console.log('ℹ️ Tabla categories no existe o está vacía');
+    }
+    
+    if (!categoriesError && (!categories || categories.length === 0)) {
       const defaultCategories = [
         { name: 'electronics', label: 'Electrónicos' },
         { name: 'fashion', label: 'Moda' },
@@ -99,32 +121,33 @@ db.serialize(() => {
         { name: 'sports', label: 'Deportes' }
       ];
       
-      defaultCategories.forEach(cat => {
-        db.run("INSERT INTO categories (name, label) VALUES (?, ?)", [cat.name, cat.label]);
-      });
+      for (const cat of defaultCategories) {
+        try {
+          await supabase.from('categories').insert(cat);
+        } catch (insertError) {
+          console.log('⚠️ Error insertando categoría:', cat.name);
+        }
+      }
       console.log('✅ Categorías por defecto creadas');
     }
-  });
+    
+    console.log('✅ Base de datos inicializada');
+    dbInitialized = true;
+  } catch (error) {
+    console.error('❌ Error inicializando BD:', error.message);
+  }
+};
+
+// Middleware para inicializar la base de datos al recibir la primera solicitud
+app.use(async (req, res, next) => {
+  if (!dbInitialized && supabase) {
+    await initDB();
+  }
+  next();
 });
 
-// Helpers
-function runQuery(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err); else resolve({ id: this.lastID, changes: this.changes });
-    });
-  });
-}
-function getQuery(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
-  });
-}
-function allQuery(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-  });
-}
+// Inicializar conexión
+testConnection();
 
 // =======================
 // 🔌 CLOUDINARY CONFIGURACIÓN MEJORADA
@@ -144,7 +167,7 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
       api_secret: undefined
     });
     
-    // Configurar con parámetros específicos para Railway
+    // Configurar con parámetros específicos
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
@@ -157,7 +180,7 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
     // Test inmediato de configuración
     console.log('🔧 Cloudinary Config Test:', {
       cloud_name: cloudinary.config().cloud_name,
-      api_key: cloudinary.config().api_key?.substring(0, 6) + '...',
+      api_key: cloudinary.config().api_key ? cloudinary.config().api_key.substring(0, 6) + '...' : 'FALTANTE',
       api_secret: cloudinary.config().api_secret ? 'CONFIGURADO' : 'FALTANTE'
     });
     
@@ -185,7 +208,7 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
 let upload;
 
 if (useCloudinary && cloudinary) {
-  // Usar memoria storage en lugar de CloudinaryStorage para mejor control
+  // Usar memory storage para Cloudinary
   const memoryStorage = multer.memoryStorage();
   
   upload = multer({ 
@@ -210,7 +233,6 @@ if (useCloudinary && cloudinary) {
   try {
     const localStorage = multer.diskStorage({
       destination: (req, file, cb) => {
-        // Verificar que el directorio existe
         if (!fs.existsSync(uploadsDir)) {
           fs.mkdirSync(uploadsDir, { recursive: true });
         }
@@ -247,7 +269,6 @@ if (useCloudinary && cloudinary) {
     console.log('📸 Configurado para almacenamiento local');
   } catch (error) {
     console.error('❌ Error configurando almacenamiento local:', error);
-    throw error;
   }
 }
 
@@ -260,13 +281,31 @@ app.get('/api/data', async (req, res) => {
   try {
     console.log('📡 Petición a /api/data');
     
-    const products = await allQuery('SELECT * FROM products ORDER BY id DESC');
-    const categories = await allQuery('SELECT * FROM categories ORDER BY id ASC');
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
+    }
     
-    console.log(`📦 ${products.length} productos encontrados`);
-    console.log(`🏷️ ${categories.length} categorías encontradas`);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('*')
+      .order('id', { ascending: false });
     
-    const processed = products.map(p => {
+    const { data: categories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('*')
+      .order('id', { ascending: true });
+    
+    if (productsError && productsError.code !== 'PGRST116') {
+      throw productsError;
+    }
+    if (categoriesError && categoriesError.code !== 'PGRST116') {
+      throw categoriesError;
+    }
+    
+    console.log(`📦 ${products?.length || 0} productos encontrados`);
+    console.log(`🏷️ ${categories?.length || 0} categorías encontradas`);
+    
+    const processed = (products || []).map(p => {
       let imgs = [];
       try {
         imgs = p.images ? JSON.parse(p.images) : [];
@@ -284,8 +323,8 @@ app.get('/api/data', async (req, res) => {
     
     res.json({ 
       products: processed, 
-      categories: categories.map(c => c.label), 
-      categoriesData: categories,
+      categories: (categories || []).map(c => c.label), 
+      categoriesData: categories || [],
       success: true
     });
     
@@ -308,6 +347,10 @@ app.post('/api/products', async (req, res) => {
   try {
     console.log('📝 Creando producto:', req.body);
     
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
+    }
+    
     const { name, shortDesc, price, category, discount, stock, images } = req.body;
     
     // Validaciones
@@ -323,27 +366,28 @@ app.post('/api/products', async (req, res) => {
       return res.status(400).json({ success: false, message: 'El stock no puede ser negativo' });
     }
     
-    const result = await runQuery(
-      `INSERT INTO products (name, shortDesc, price, category, discount, stock, images)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        name.trim(), 
-        shortDesc || '', 
-        parseFloat(price), 
-        category || '', 
-        parseInt(discount) || 0, 
-        parseInt(stock), 
-        JSON.stringify(images || [])
-      ]
-    );
+    const { data, error } = await supabase
+      .from('products')
+      .insert({
+        name: name.trim(),
+        shortdesc: shortDesc || '',
+        price: parseFloat(price),
+        category: category || '',
+        discount: parseInt(discount) || 0,
+        stock: parseInt(stock),
+        images: JSON.stringify(images || [])
+      })
+      .select()
+      .single();
     
-    const created = await getQuery('SELECT * FROM products WHERE id=?', [result.id]);
-    if (created) {
-      created.images = JSON.parse(created.images || '[]');
+    if (error) throw error;
+    
+    if (data) {
+      data.images = JSON.parse(data.images || '[]');
     }
     
-    console.log('✅ Producto creado:', created);
-    res.json({ success: true, product: created });
+    console.log('✅ Producto creado:', data);
+    res.json({ success: true, product: data });
     
   } catch (e) { 
     console.error('❌ Error creando producto:', e);
@@ -361,6 +405,10 @@ app.put('/api/products/:id', async (req, res) => {
     const productId = parseInt(req.params.id);
     console.log('📝 Actualizando producto:', productId, req.body);
     
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
+    }
+    
     const { name, shortDesc, price, category, discount, stock, images } = req.body;
     
     // Validaciones
@@ -376,32 +424,33 @@ app.put('/api/products/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'El stock no puede ser negativo' });
     }
     
-    const result = await runQuery(
-      `UPDATE products SET name=?, shortDesc=?, price=?, category=?, discount=?, stock=?, images=?
-       WHERE id=?`,
-      [
-        name.trim(), 
-        shortDesc || '', 
-        parseFloat(price), 
-        category || '', 
-        parseInt(discount) || 0, 
-        parseInt(stock), 
-        JSON.stringify(images || []),
-        productId
-      ]
-    );
+    const { data, error } = await supabase
+      .from('products')
+      .update({
+        name: name.trim(),
+        shortdesc: shortDesc || '',
+        price: parseFloat(price),
+        category: category || '',
+        discount: parseInt(discount) || 0,
+        stock: parseInt(stock),
+        images: JSON.stringify(images || [])
+      })
+      .eq('id', productId)
+      .select()
+      .single();
     
-    if (result.changes === 0) {
+    if (error) throw error;
+    
+    if (!data) {
       return res.status(404).json({ success: false, message: 'Producto no encontrado' });
     }
     
-    const updated = await getQuery('SELECT * FROM products WHERE id=?', [productId]);
-    if (updated) {
-      updated.images = JSON.parse(updated.images || '[]');
+    if (data) {
+      data.images = JSON.parse(data.images || '[]');
     }
     
-    console.log('✅ Producto actualizado:', updated);
-    res.json({ success: true, product: updated });
+    console.log('✅ Producto actualizado:', data);
+    res.json({ success: true, product: data });
     
   } catch (e) { 
     console.error('❌ Error actualizando producto:', e);
@@ -419,11 +468,16 @@ app.delete('/api/products/:id', async (req, res) => {
     const productId = parseInt(req.params.id);
     console.log('🗑️ Eliminando producto:', productId);
     
-    const result = await runQuery('DELETE FROM products WHERE id=?', [productId]);
-    
-    if (result.changes === 0) {
-      return res.status(404).json({ success: false, message: 'Producto no encontrado' });
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
     }
+    
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId);
+    
+    if (error) throw error;
     
     console.log('✅ Producto eliminado');
     res.json({ success: true, message: 'Producto eliminado correctamente' });
@@ -447,6 +501,10 @@ app.post('/api/categories', async (req, res) => {
   try {
     console.log('📝 Creando categoría:', req.body);
     
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
+    }
+    
     const { name, label } = req.body;
     
     // Validaciones
@@ -459,20 +517,30 @@ app.post('/api/categories', async (req, res) => {
     }
     
     // Verificar que no existe
-    const existing = await getQuery('SELECT * FROM categories WHERE name = ? OR label = ?', [name.trim(), label.trim()]);
+    const { data: existing } = await supabase
+      .from('categories')
+      .select('*')
+      .or(`name.eq.${name.trim()},label.eq.${label.trim()}`)
+      .limit(1)
+      .maybeSingle();
+    
     if (existing) {
       return res.status(400).json({ success: false, message: 'Ya existe una categoría con ese nombre' });
     }
     
-    const result = await runQuery(
-      'INSERT INTO categories (name, label) VALUES (?, ?)',
-      [name.trim().toLowerCase(), label.trim()]
-    );
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({
+        name: name.trim().toLowerCase(),
+        label: label.trim()
+      })
+      .select()
+      .single();
     
-    const created = await getQuery('SELECT * FROM categories WHERE id = ?', [result.id]);
+    if (error) throw error;
     
-    console.log('✅ Categoría creada:', created);
-    res.json({ success: true, category: created });
+    console.log('✅ Categoría creada:', data);
+    res.json({ success: true, category: data });
     
   } catch (e) {
     console.error('❌ Error creando categoría:', e);
@@ -490,6 +558,10 @@ app.put('/api/categories/:id', async (req, res) => {
     const categoryId = parseInt(req.params.id);
     console.log('📝 Actualizando categoría:', categoryId, req.body);
     
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
+    }
+    
     const { name, label } = req.body;
     
     // Validaciones
@@ -502,42 +574,52 @@ app.put('/api/categories/:id', async (req, res) => {
     }
     
     // Verificar que no existe otra con el mismo nombre
-    const existing = await getQuery(
-      'SELECT * FROM categories WHERE (name = ? OR label = ?) AND id != ?', 
-      [name.trim(), label.trim(), categoryId]
-    );
+    const { data: existing } = await supabase
+      .from('categories')
+      .select('*')
+      .or(`name.eq.${name.trim()},label.eq.${label.trim()}`)
+      .neq('id', categoryId)
+      .limit(1)
+      .maybeSingle();
+    
     if (existing) {
       return res.status(400).json({ success: false, message: 'Ya existe otra categoría con ese nombre' });
     }
     
     // Obtener la categoría actual para actualizar productos si cambió el label
-    const currentCategory = await getQuery('SELECT * FROM categories WHERE id = ?', [categoryId]);
+    const { data: currentCategory } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', categoryId)
+      .single();
+    
     if (!currentCategory) {
       return res.status(404).json({ success: false, message: 'Categoría no encontrada' });
     }
     
-    const result = await runQuery(
-      'UPDATE categories SET name = ?, label = ? WHERE id = ?',
-      [name.trim().toLowerCase(), label.trim(), categoryId]
-    );
+    const { data, error } = await supabase
+      .from('categories')
+      .update({
+        name: name.trim().toLowerCase(),
+        label: label.trim()
+      })
+      .eq('id', categoryId)
+      .select()
+      .single();
     
-    if (result.changes === 0) {
-      return res.status(404).json({ success: false, message: 'Categoría no encontrada' });
-    }
+    if (error) throw error;
     
     // Si cambió el label, actualizar productos que usan esta categoría
     if (currentCategory.label !== label.trim()) {
-      await runQuery(
-        'UPDATE products SET category = ? WHERE category = ?',
-        [label.trim(), currentCategory.label]
-      );
+      await supabase
+        .from('products')
+        .update({ category: label.trim() })
+        .eq('category', currentCategory.label);
       console.log('✅ Productos actualizados con nueva categoría');
     }
     
-    const updated = await getQuery('SELECT * FROM categories WHERE id = ?', [categoryId]);
-    
-    console.log('✅ Categoría actualizada:', updated);
-    res.json({ success: true, category: updated });
+    console.log('✅ Categoría actualizada:', data);
+    res.json({ success: true, category: data });
     
   } catch (e) {
     console.error('❌ Error actualizando categoría:', e);
@@ -555,15 +637,28 @@ app.delete('/api/categories/:id', async (req, res) => {
     const categoryId = parseInt(req.params.id);
     console.log('🗑️ Eliminando categoría:', categoryId);
     
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
+    }
+    
     // Verificar si la categoría existe
-    const category = await getQuery('SELECT * FROM categories WHERE id = ?', [categoryId]);
+    const { data: category } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', categoryId)
+      .single();
+    
     if (!category) {
       return res.status(404).json({ success: false, message: 'Categoría no encontrada' });
     }
     
     // Verificar si hay productos usando esta categoría
-    const productsWithCategory = await allQuery('SELECT COUNT(*) as count FROM products WHERE category = ?', [category.label]);
-    const productCount = productsWithCategory[0]?.count || 0;
+    const { data: productsWithCategory, error: countError } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('category', category.label);
+    
+    const productCount = productsWithCategory?.length || 0;
     
     if (productCount > 0) {
       return res.status(400).json({ 
@@ -572,11 +667,12 @@ app.delete('/api/categories/:id', async (req, res) => {
       });
     }
     
-    const result = await runQuery('DELETE FROM categories WHERE id = ?', [categoryId]);
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', categoryId);
     
-    if (result.changes === 0) {
-      return res.status(404).json({ success: false, message: 'Categoría no encontrada' });
-    }
+    if (error) throw error;
     
     console.log('✅ Categoría eliminada:', category.label);
     res.json({ success: true, message: `Categoría "${category.label}" eliminada correctamente` });
@@ -596,19 +692,37 @@ app.get('/api/categories/stats', async (req, res) => {
   try {
     console.log('📊 Obteniendo estadísticas de categorías');
     
-    const stats = await allQuery(`
-      SELECT 
-        c.id,
-        c.name,
-        c.label,
-        COUNT(p.id) as product_count,
-        COALESCE(SUM(p.stock), 0) as total_stock,
-        c.created_at
-      FROM categories c
-      LEFT JOIN products p ON p.category = c.label
-      GROUP BY c.id, c.name, c.label, c.created_at
-      ORDER BY product_count DESC, c.label ASC
-    `);
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
+    }
+    
+    // Obtener todas las categorías
+    const { data: categories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('*')
+      .order('id', { ascending: true });
+    
+    if (categoriesError) throw categoriesError;
+    
+    // Para cada categoría, contar productos y stock
+    const statsPromises = (categories || []).map(async (category) => {
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('stock')
+        .eq('category', category.label);
+      
+      const productCount = products?.length || 0;
+      const totalStock = products?.reduce((sum, p) => sum + (p.stock || 0), 0) || 0;
+      
+      return {
+        ...category,
+        product_count: productCount,
+        total_stock: totalStock
+      };
+    });
+    
+    const stats = await Promise.all(statsPromises);
+    stats.sort((a, b) => b.product_count - a.product_count);
     
     console.log('✅ Estadísticas obtenidas:', stats.length);
     res.json({ success: true, stats });
@@ -654,7 +768,7 @@ app.use('/api/upload', (req, res, next) => {
 
 app.post('/api/upload', (req, res) => {
   console.log('📸 Iniciando subida de imágenes...');
-  console.log('📸 Usando:', useCloudinary ? 'Cloudinary ☁️' : 'Local 💾');
+  console.log('📸 Sistema configurado - Cloudinary:', useCloudinary ? 'SI' : 'NO');
   
   if (!upload) {
     console.error('❌ Upload no configurado');
@@ -804,6 +918,58 @@ app.get('/api/test-cloudinary-connection', async (req, res) => {
   }
 });
 
+// Test de conexión a Supabase
+app.get('/api/test-database', async (req, res) => {
+  try {
+    console.log('🧪 Test de conexión a Supabase...');
+    
+    if (!supabase) {
+      throw new Error('Supabase no está inicializado');
+    }
+    
+    // Test 1: Conexión básica
+    const { data: healthCheck, error: healthError } = await supabase
+      .from('products')
+      .select('id')
+      .limit(1);
+    
+    if (healthError && healthError.code !== 'PGRST116') {
+      throw healthError;
+    }
+    
+    // Test 2: Contar registros
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true });
+    
+    const { data: categories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('*', { count: 'exact', head: true });
+    
+    res.json({
+      success: true,
+      message: 'Supabase funcionando correctamente',
+      database_info: {
+        current_time: new Date().toISOString(),
+        supabase_url: process.env.SUPABASE_URL ? 'Configurada' : 'No configurada',
+        record_counts: {
+          products: products?.length || 0,
+          categories: categories?.length || 0
+        },
+        health_check: 'OK'
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error en test de Supabase:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error en test de Supabase',
+      error: error.message
+    });
+  }
+});
+
 // Ruta para probar la conexión con Cloudinary (legacy)
 app.get('/api/test-cloudinary', async (req, res) => {
   try {
@@ -882,6 +1048,8 @@ app.get('/api/upload-info', (req, res) => {
       uploads_dir_exists: fs.existsSync(uploadsDir)
     },
     environment: {
+      supabase_url: !!process.env.SUPABASE_URL,
+      supabase_anon_key: !!process.env.SUPABASE_ANON_KEY,
       cloudinary_cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
       cloudinary_api_key: !!process.env.CLOUDINARY_API_KEY,
       cloudinary_api_secret: !!process.env.CLOUDINARY_API_SECRET,
@@ -986,12 +1154,20 @@ app.get('/api/debug-logs', (req, res) => {
   const debugInfo = {
     timestamp: new Date().toISOString(),
     server_status: 'running',
+    database: {
+      type: 'Supabase PostgreSQL',
+      url_configured: !!process.env.SUPABASE_URL,
+      anon_key_configured: !!process.env.SUPABASE_ANON_KEY,
+      client_initialized: !!supabase
+    },
     upload_system: {
       using_cloudinary: useCloudinary,
       cloudinary_module_loaded: !!cloudinary,
       upload_middleware_configured: !!upload
     },
     environment_vars: {
+      has_supabase_url: !!process.env.SUPABASE_URL,
+      has_supabase_anon_key: !!process.env.SUPABASE_ANON_KEY,
       has_cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
       has_api_key: !!process.env.CLOUDINARY_API_KEY,
       has_api_secret: !!process.env.CLOUDINARY_API_SECRET,
@@ -1044,22 +1220,34 @@ app.get('/uploads/placeholder.jpg', (req, res) => {
   res.send(placeholderSvg);
 });
 
-// =======================
-// 🚀 INICIAR SERVIDOR
-// =======================
-app.listen(PORT, () => {
-    console.log(`🌐 Servidor corriendo en puerto ${PORT}`);
-    console.log(`🛒 Tienda: http://localhost:${PORT}`);
-    console.log(`⚙️ Admin: http://localhost:${PORT}/admin`);
-    console.log(`📊 Upload Info: ${user}:${cloudinay_connection_string}-cloudinay:${'Local 🏠'}:`);
-    console.log("=================");
-    console.log(`🔧 Rutas de diagnóstico disponibles:`);
-    console.log(`🐛 Debug: http://localhost:${PORT}/api/debug-logs`);
-    console.log(`💚 Test Cloudinary: http://localhost:${PORT}/api/test-cloudinary-connection`);
-    console.log(`🧪 Test Legacy: http://localhost:${PORT}/api/test-cloudinary`);
-    console.log(`🆙 Upload Info: http://localhost:${PORT}/api/upload-info`);
-    console.log(`🔬 Test Upload: http://localhost:${PORT}/api/test-upload`);
-    console.log("=================");
+// Middleware de errores global
+app.use((err, req, res, next) => {
+  console.error('❌ Error global:', err);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
+// Iniciar servidor
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+  console.log(`🌐 Tienda: http://localhost:${PORT}`);
+  console.log(`👑 Admin: http://localhost:${PORT}/admin`);
+});
+
+// Manejo graceful de cierre del servidor
+process.on('SIGTERM', () => {
+  console.log('🔄 Recibida señal SIGTERM, cerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor cerrado correctamente');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🔄 Recibida señal SIGINT, cerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor cerrado correctamente');
+    process.exit(0);
+  });
 });
 
 // IMPORTANTE: Para que funcione en Vercel
