@@ -808,12 +808,7 @@ app.post('/api/upload', (req, res) => {
             cloudinary.uploader.upload_stream({
               folder: process.env.CLOUDINARY_FOLDER || "hernandezstore",
               public_id: `img_${timestamp}_${index}`,
-              resource_type: "image",
-              allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-              transformation: [
-                { quality: "auto:good" },
-                { fetch_format: "auto" }
-              ]
+              resource_type: "image"
             }, (error, result) => {
               if (error) {
                 console.error(`❌ Error subiendo archivo ${index + 1}:`, error);
